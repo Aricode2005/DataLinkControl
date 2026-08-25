@@ -8,7 +8,7 @@ It is designed with low-level design patterns to ensure extensibility, maintaina
 
 1. Open your terminal and navigate to the project directory:
    ```bash
-   cd C:\Users\aritr\.gemini\antigravity\scratch\data_link_flow_control
+   cd "C:\Users\aritr\OneDrive\Desktop\CNLAB\Assignment2"
    ```
 2. Compile all Java files:
    ```powershell
