@@ -4,6 +4,7 @@ import com.network.protocol.*;
 import com.network.sender.Sender;
 import com.network.receiver.Receiver;
 import com.network.util.NetworkSimulator;
+import com.network.util.error.ErrorInjector;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -25,8 +26,8 @@ public class Main {
         // 1. Stop and Wait
         System.out.println("--- 1. Stop and Wait ---");
         runSimulation(
-            new StopAndWaitSender(senderPort, ip, receiverPort, new NetworkSimulator(0.2, 0.2, 100)),
-            new StopAndWaitReceiver(receiverPort, new NetworkSimulator(0.1, 0.1, 100)),
+            new StopAndWaitSender(senderPort, ip, receiverPort, new NetworkSimulator(0.2, 0.2, 100, new ErrorInjector(new ErrorInjector.NoError()))),
+            new StopAndWaitReceiver(receiverPort, new NetworkSimulator(0.1, 0.1, 100, new ErrorInjector(new ErrorInjector.NoError()))),
             data
         );
         
@@ -35,8 +36,8 @@ public class Main {
         // 2. Go-Back-N ARQ
         System.out.println("\n--- 2. Go-Back-N ARQ (Window Size: 3) ---");
         runSimulation(
-            new GoBackNSender(senderPort + 2, ip, receiverPort + 2, new NetworkSimulator(0.2, 0.2, 100), 3),
-            new GoBackNReceiver(receiverPort + 2, new NetworkSimulator(0.1, 0.1, 100)),
+            new GoBackNSender(senderPort + 2, ip, receiverPort + 2, new NetworkSimulator(0.2, 0.2, 100, new ErrorInjector(new ErrorInjector.NoError())), 3),
+            new GoBackNReceiver(receiverPort + 2, new NetworkSimulator(0.1, 0.1, 100, new ErrorInjector(new ErrorInjector.NoError()))),
             data
         );
         
@@ -45,8 +46,8 @@ public class Main {
         // 3. Selective Repeat ARQ
         System.out.println("\n--- 3. Selective Repeat ARQ (Window Size: 3) ---");
         runSimulation(
-            new SelectiveRepeatSender(senderPort + 4, ip, receiverPort + 4, new NetworkSimulator(0.2, 0.2, 100), 3),
-            new SelectiveRepeatReceiver(receiverPort + 4, new NetworkSimulator(0.1, 0.1, 100), 3),
+            new SelectiveRepeatSender(senderPort + 4, ip, receiverPort + 4, new NetworkSimulator(0.2, 0.2, 100, new ErrorInjector(new ErrorInjector.NoError())), 3),
+            new SelectiveRepeatReceiver(receiverPort + 4, new NetworkSimulator(0.1, 0.1, 100, new ErrorInjector(new ErrorInjector.NoError())), 3),
             data
         );
     }

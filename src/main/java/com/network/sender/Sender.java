@@ -23,6 +23,13 @@ public abstract class Sender {
     protected int currentTimeoutMs = 2000;
     protected ConcurrentHashMap<Integer, Timer> timers = new ConcurrentHashMap<>();
     protected long rttStart = -1;
+    
+    // Metrics
+    public int totalRetransmissions = 0;
+    public long totalRTT = 0;
+    public int rttSamples = 0;
+    public long simulationStartTime = 0;
+    public long simulationEndTime = 0;
 
     public Sender(int localPort, String receiverIp, int receiverPort, NetworkSimulator channel) throws Exception {
         this.socket = new DatagramSocket(localPort);
@@ -76,8 +83,7 @@ public abstract class Sender {
      * Called on timeout to recompute timeout or just handle retransmission.
      */
     protected void Timeout(int seqNo) {
-        System.out.println("[Sender] Timeout occurred for frame " + seqNo);
-        // Simple timeout computation (could be more complex like TCP Jacobson/Karels algorithm)
+        totalRetransmissions++;
         currentTimeoutMs = Math.min(currentTimeoutMs * 2, 5000); 
         handleTimeout(seqNo);
     }
@@ -85,6 +91,8 @@ public abstract class Sender {
     protected void updateRTT() {
         if (rttStart != -1) {
             long rtt = System.currentTimeMillis() - rttStart;
+            totalRTT += rtt;
+            rttSamples++;
             currentTimeoutMs = (int) (0.8 * currentTimeoutMs + 0.2 * rtt); // smoothed RTT
             rttStart = -1;
         }
