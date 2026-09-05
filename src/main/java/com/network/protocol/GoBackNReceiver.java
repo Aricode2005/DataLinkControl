@@ -1,9 +1,7 @@
 package com.network.protocol;
-
 import com.network.model.Frame;
 import com.network.receiver.Receiver;
 import com.network.util.NetworkSimulator;
-
 import java.io.IOException;
 
 public class GoBackNReceiver extends Receiver {
@@ -20,17 +18,16 @@ public class GoBackNReceiver extends Receiver {
             System.out.println("[Receiver-GBN] Frame corrupted, discarding.");
             return;
         }
-
-        if (frame.getSeqNo() == expectedSeqNo) {
+        int seqNo = frame.getSeqNo();
+        if (seqNo == (expectedSeqNo % Frame.MAX_SEQ)) {
             System.out.println("[Receiver-GBN] Frame accepted: " + new String(frame.getPayload()));
+            statBytesReceived += frame.getPayload().length;
             expectedSeqNo++;
         } else {
-            System.out.println("[Receiver-GBN] Out of order frame, expected " + expectedSeqNo + ", got " + frame.getSeqNo());
+            System.out.println("[Receiver-GBN] Out of order frame, expected " + (expectedSeqNo % Frame.MAX_SEQ) + ", got " + seqNo);
         }
-
         try {
-            // GBN sends cumulative ACK for the next expected frame
-            Send(expectedSeqNo, false); 
+            Send(expectedSeqNo % Frame.MAX_SEQ, false); 
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -1,0 +1,14 @@
+=== Special Failure Cases ===
+Max Seq (M_BITS=4) = 16
+
+1. GBN Failure Case (N = 16)
+If N = 16 (which is >= MAX_SEQ), the window perfectly overlaps the sequence space.
+If a frame is severely delayed, the sender times out and re-sends the window.
+The receiver eventually advances its expected sequence number and wraps around.
+When the original delayed frame finally arrives, it has the exact sequence number the receiver is now expecting, causing Erroneous Acceptance.
+
+2. SR Failure Case (N = 9)
+If N = 9 (which is > MAX_SEQ / 2), the sender's window and receiver's window can overlap over the wrap-around boundary.
+A delayed frame from the previous cycle can be erroneously accepted into the receiver's buffer for the new cycle because the sequence numbers are ambiguous.
+
+(To see this in action, run Main.java interactively and enter these invalid window sizes when prompted. The network simulator's delayProbability will eventually trigger the glitch.)

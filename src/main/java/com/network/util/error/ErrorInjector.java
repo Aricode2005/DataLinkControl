@@ -13,18 +13,22 @@ public class ErrorInjector {
         this.strategy = newStrategy;
     }
 
+    public ErrorInjectionStrategy getStrategy() {
+        return strategy;
+    }
+
     public void execute(byte[] data, int length) {
         if (strategy != null && length > 0) {
             strategy.injectError(data, length);
         }
     }
 
-    // --- Strategies ---
+    
 
     public static class NoError extends ErrorInjectionStrategy {
         @Override
         public void injectError(byte[] data, int length) {
-            // Do nothing
+           
         }
     }
 
@@ -58,7 +62,7 @@ public class ErrorInjector {
         public void injectError(byte[] data, int length) {
             int totalBits = length * 8;
             if (totalBits == 0) return;
-            int numErrors = ((random.nextInt(3)) * 2) + 3; // 3, 5, or 7
+            int numErrors = ((random.nextInt(3)) * 2) + 3;
             for (int i = 0; i < numErrors; ++i) {
                 int randomBit = random.nextInt(totalBits);
                 flipBit(data, totalBits, randomBit);
@@ -95,7 +99,6 @@ public class ErrorInjector {
         @Override
         public void injectError(byte[] data, int length) {
             if (length < 5) return;
-            // From C++ code logic for CRC32 miss
             data[0] ^= 0x01;
             data[1] ^= 0x04;
             data[2] ^= (byte)0xC1;

@@ -1,0 +1,10 @@
+Protocol,WindowSize,Efficiency(%),AvgRTT(ms)
+GBN,2,83.3,157
+GBN,4,71.4,98
+GBN,8,78.9,142
+GBN,12,71.4,360
+GBN,15,66.7,80
+SR,2,93.8,2
+SR,4,81.1,2
+SR,6,85.7,3
+SR,8,81.1,3

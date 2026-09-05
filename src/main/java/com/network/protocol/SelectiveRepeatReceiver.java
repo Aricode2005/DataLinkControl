@@ -1,9 +1,7 @@
 package com.network.protocol;
-
 import com.network.model.Frame;
 import com.network.receiver.Receiver;
 import com.network.util.NetworkSimulator;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,43 +15,51 @@ public class SelectiveRepeatReceiver extends Receiver {
         super(localPort, channel);
         this.windowSize = windowSize;
     }
+    
+    private int getAbsoluteSeq(int seqNoMod, int base) {
+        int baseMod = base % Frame.MAX_SEQ;
+        int diff = seqNoMod - baseMod;
+        if (diff < 0) diff += Frame.MAX_SEQ;
+        int abs = base + diff;
+        if (abs >= base + windowSize) {
+            abs -= Frame.MAX_SEQ;
+        }
+        return abs;
+    }
 
     @Override
     protected void Recv(Frame frame) {
-        int seqNo = frame.getSeqNo();
-        System.out.println("[Receiver-SR] Received frame " + seqNo);
-
+        int seqNoMod = frame.getSeqNo();
+        System.out.println("[Receiver-SR] Received frame " + seqNoMod);
         if (!Check(frame)) {
             System.out.println("[Receiver-SR] Frame corrupted, sending NAK.");
             try {
-                Send(seqNo, true); // Send NAK
+                Send(seqNoMod, true);
             } catch (IOException e) {
                 e.printStackTrace();
             }
             return;
         }
 
-        if (seqNo >= base && seqNo < base + windowSize) {
-            System.out.println("[Receiver-SR] Frame " + seqNo + " buffered.");
-            buffer.put(seqNo, frame);
-            
+        int absSeqNo = getAbsoluteSeq(seqNoMod, base);
+        if (absSeqNo >= base && absSeqNo < base + windowSize) {
+            System.out.println("[Receiver-SR] Frame " + (absSeqNo % Frame.MAX_SEQ) + " buffered.");
+            buffer.put(absSeqNo, frame);
             try {
-                Send(seqNo, false); // Independent ACK
+                Send(seqNoMod, false); 
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
-            // Deliver frames and slide window
             while (buffer.containsKey(base)) {
                 Frame f = buffer.remove(base);
-                System.out.println("[Receiver-SR] Frame " + base + " accepted/delivered: " + new String(f.getPayload()));
+                System.out.println("[Receiver-SR] Frame " + (base % Frame.MAX_SEQ) + " accepted/delivered: " + new String(f.getPayload()));
+                statBytesReceived += f.getPayload().length;
                 base++;
             }
-        } else if (seqNo >= base - windowSize && seqNo < base) {
-            // Already ACKed but ACK might have been lost
-            System.out.println("[Receiver-SR] Received duplicate frame " + seqNo + ", re-ACKing.");
+        } else if (absSeqNo >= base - windowSize && absSeqNo < base) {
+            System.out.println("[Receiver-SR] Received duplicate frame " + (absSeqNo % Frame.MAX_SEQ) + ", re-ACKing.");
             try {
-                Send(seqNo, false);
+                Send(seqNoMod, false);
             } catch (IOException e) {
                 e.printStackTrace();
             }

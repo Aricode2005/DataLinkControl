@@ -4,14 +4,9 @@ import com.network.model.Frame;
 import com.network.model.Ack;
 import java.util.zip.CRC32;
 
-/**
- * Utility class to calculate and verify CRC (Frame Check Sequence).
- */
+
 public class CRCUtils {
 
-    /**
-     * Calculates FCS for a Frame.
-     */
     public static long calculateFCS(Frame frame) {
         CRC32 crc = new CRC32();
         crc.update(frame.getSourceAddress());
@@ -24,16 +19,10 @@ public class CRCUtils {
         return crc.getValue();
     }
 
-    /**
-     * Verifies if a Frame has a valid FCS.
-     */
     public static boolean verifyFCS(Frame frame) {
         return calculateFCS(frame) == frame.getFcs();
     }
 
-    /**
-     * Calculates FCS for an Ack.
-     */
     public static long calculateFCS(Ack ack) {
         CRC32 crc = new CRC32();
         crc.update(ack.getAckNo());
@@ -41,9 +30,7 @@ public class CRCUtils {
         return crc.getValue();
     }
 
-    /**
-     * Verifies if an Ack has a valid FCS.
-     */
+  
     public static boolean verifyFCS(Ack ack) {
         return calculateFCS(ack) == ack.getFcs();
     }

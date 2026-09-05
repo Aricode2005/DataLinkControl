@@ -4,16 +4,12 @@ import com.network.model.Ack;
 import com.network.model.Frame;
 import com.network.util.CRCUtils;
 import com.network.util.NetworkSimulator;
-
 import java.io.*;
 import java.net.*;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Abstract Sender class defining the required methods.
- */
 public abstract class Sender {
     protected DatagramSocket socket;
     protected InetAddress receiverAddress;
@@ -24,12 +20,12 @@ public abstract class Sender {
     protected ConcurrentHashMap<Integer, Timer> timers = new ConcurrentHashMap<>();
     protected long rttStart = -1;
     
-    // Metrics
     public int totalRetransmissions = 0;
     public long totalRTT = 0;
     public int rttSamples = 0;
     public long simulationStartTime = 0;
     public long simulationEndTime = 0;
+    public static final long MAX_LIFETIME = 2500;
 
     public Sender(int localPort, String receiverIp, int receiverPort, NetworkSimulator channel) throws Exception {
         this.socket = new DatagramSocket(localPort);
@@ -37,10 +33,11 @@ public abstract class Sender {
         this.receiverPort = receiverPort;
         this.channel = channel;
     }
+    
+    protected boolean isTooLate(long timestamp) {
+        return (System.currentTimeMillis() - timestamp) > MAX_LIFETIME;
+    }
 
-    /**
-     * Prepares the frame following the structure.
-     */
     protected Frame Framing(int seqNo, byte[] payload) {
         byte[] srcMac = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
         byte[] destMac = {0x66, 0x77, (byte)0x88, (byte)0x99, (byte)0xAA, (byte)0xBB};
@@ -50,22 +47,20 @@ public abstract class Sender {
         return frame;
     }
 
-    /**
-     * Introduces random delay / error.
-     */
     protected void Channel(Object obj) throws IOException {
+        if (obj instanceof Frame) {
+            ((Frame) obj).setTimestamp(System.currentTimeMillis());
+            ((Frame) obj).incrementTransmissions();
+        }
         channel.sendWithSimulation(socket, obj, receiverAddress, receiverPort);
     }
 
-    /**
-     * Start timer for a specific frame sequence number.
-     */
     protected void Timer(int seqNo) {
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                Timeout(seqNo);
+                onTimerExpiration(seqNo);
             }
         }, currentTimeoutMs);
         timers.put(seqNo, timer);
@@ -79,28 +74,22 @@ public abstract class Sender {
         }
     }
 
-    /**
-     * Called on timeout to recompute timeout or just handle retransmission.
-     */
-    protected void Timeout(int seqNo) {
+    protected void onTimerExpiration(int seqNo) {
         totalRetransmissions++;
         currentTimeoutMs = Math.min(currentTimeoutMs * 2, 5000); 
         handleTimeout(seqNo);
     }
 
-    protected void updateRTT() {
+    protected void Timeout() {
         if (rttStart != -1) {
             long rtt = System.currentTimeMillis() - rttStart;
             totalRTT += rtt;
             rttSamples++;
-            currentTimeoutMs = (int) (0.8 * currentTimeoutMs + 0.2 * rtt); // smoothed RTT
+            currentTimeoutMs = (int) (0.8 * currentTimeoutMs + 0.2 * rtt);
             rttStart = -1;
         }
     }
 
-    /**
-     * Listening loop for incoming ACKs.
-     */
     public void startListening() {
         new Thread(() -> {
             byte[] buf = new byte[1024];
@@ -115,8 +104,10 @@ public abstract class Sender {
                     
                     if (obj instanceof Ack) {
                         Ack ack = (Ack) obj;
+                        if (isTooLate(ack.getTimestamp())) {
+                            continue;
+                        }
                         if (!CRCUtils.verifyFCS(ack)) {
-                            System.out.println("[Sender] Received corrupted ACK.");
                             continue;
                         }
                         Recv(ack);
@@ -133,7 +124,6 @@ public abstract class Sender {
         timers.values().forEach(Timer::cancel);
     }
 
-    // Abstract methods to be implemented by specific Flow Control strategies
     public abstract void Send(byte[][] dataChunks) throws Exception;
     protected abstract void Recv(Ack ack);
     protected abstract void handleTimeout(int seqNo);

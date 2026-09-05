@@ -1,123 +1,93 @@
 package com.network;
-
 import com.network.protocol.*;
 import com.network.sender.Sender;
 import com.network.receiver.Receiver;
 import com.network.util.NetworkSimulator;
 import com.network.util.error.ErrorInjector;
-import com.network.util.error.ErrorInjectionStrategy;
-
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.PrintWriter;
 
 public class TestRunner {
-    private static int portCounter = 9000;
-    
+    private static int portCounter = 10000;
     public static void main(String[] args) throws Exception {
-        System.out.println("Starting Comprehensive Testing...");
+        PrintWriter out = new PrintWriter(new FileWriter("comparative_analysis.txt"), true);
+        System.out.println("Starting Comparative Analysis... (This will take a few minutes under heavy network delay)");
         
-        try (PrintWriter writer = new PrintWriter(new FileWriter("simulation_results.txt"))) {
-            writer.println("=================================================");
-            writer.println("      DATA LINK FLOW CONTROL TEST REPORT         ");
-            writer.println("=================================================");
-            
-            byte[][] data = generateData(10); // 10 frames
-            
-            // --- Case 1 & 2: Compare time and efficiency WITHOUT error ---
-            writer.println("\n--- Case 1 & 2: NO ERROR / LOST FRAME ---");
-            writer.println("Comparing efficiency and time without any errors.");
-            
-            runTest(writer, "Stop and Wait", "None", 0.0, 0.0, data, 1);
-            runTest(writer, "Go-Back-N", "None", 0.0, 0.0, data, 1);
-            runTest(writer, "Selective Repeat", "None", 0.0, 0.0, data, 1);
-
-            // --- Case 3: Compare efficiency for different probabilities (0.1 - 0.5) ---
-            writer.println("\n--- Case 3: VARYING ERROR PROBABILITY (0.1 to 0.5) ---");
-            writer.println("Using SingleBitError Strategy");
-            
-            double[] probabilities = {0.1, 0.3, 0.5};
-            for (double p : probabilities) {
-                writer.println("\n>> Testing with Error Probability = " + p);
-                
-                runTest(writer, "Stop and Wait", "SingleBitError", p, p, data, 2);
-                runTest(writer, "Go-Back-N", "SingleBitError", p, p, data, 2);
-                runTest(writer, "Selective Repeat", "SingleBitError", p, p, data, 2);
-            }
-            
-            writer.println("\n=================================================");
-            writer.println("                  TEST COMPLETE                  ");
-            writer.println("=================================================");
+        out.println("=== Data Link Layer Comparative Analysis ===");
+        out.println("Sequence Space (m-bits): 4, MAX_SEQ: 16");
+        byte[][] data = new byte[30][]; // Reduced from 50 to 30 to speed up 50% loss tests
+        for (int i = 0; i < 30; i++) {
+            data[i] = new byte[50]; 
         }
-        System.out.println("Testing complete. Results saved to simulation_results.txt");
+        
+        System.out.println("\n--- 1. Base Case (0% Error, 0% Delay) ---");
+        out.println("\n--- 1. Base Case (0% Error, 0% Delay) ---");
+        runTest(out, "Stop-and-Wait", "SAW", 1, 0.0, 0.0, data);
+        runTest(out, "Go-Back-N (N=7)", "GBN", 7, 0.0, 0.0, data);
+        runTest(out, "Selective Repeat (N=7)", "SR", 7, 0.0, 0.0, data);
+        
+        System.out.println("\n--- 2. Efficiency vs Error Probability (0% Delay) ---");
+        out.println("\n--- 2. Efficiency vs Error Probability (0% Delay) ---");
+        for (double p = 0.1; p <= 0.5; p += 0.1) {
+            System.out.printf("\n[Error Probability: %.1f]\n", p);
+            out.printf("\n[Error Probability: %.1f]\n", p);
+            runTest(out, "Stop-and-Wait", "SAW", 1, 0.0, p, data);
+            runTest(out, "Go-Back-N (N=7)", "GBN", 7, 0.0, p, data);
+            runTest(out, "Selective Repeat (N=7)", "SR", 7, 0.0, p, data);
+        }
+        
+        System.out.println("\n--- 3. Efficiency vs Delay Probability (0% Error) ---");
+        out.println("\n--- 3. Efficiency vs Delay Probability (0% Error) ---");
+        for (double p = 0.1; p <= 0.5; p += 0.1) {
+            System.out.printf("\n[Delay Probability: %.1f]\n", p);
+            out.printf("\n[Delay Probability: %.1f]\n", p);
+            runTest(out, "Stop-and-Wait", "SAW", 1, p, 0.0, data);
+            runTest(out, "Go-Back-N (N=7)", "GBN", 7, p, 0.0, data);
+            runTest(out, "Selective Repeat (N=7)", "SR", 7, p, 0.0, data);
+        }
+        
+        out.close();
+        System.out.println("\nAnalysis completely finished! All data saved to comparative_analysis.txt");
     }
-
-    private static void runTest(PrintWriter writer, String protocolName, String errorStrategy, double lossP, double errP, byte[][] data, int caseNo) throws Exception {
-        int senderPort = portCounter++;
-        int receiverPort = portCounter++;
+    
+    private static void runTest(PrintWriter out, String name, String type, int windowSize, double delayProb, double errProb, byte[][] data) throws Exception {
+        System.out.print("  -> Testing " + name + "... ");
+        int rPort = portCounter++;
+        NetworkSimulator sChannel = new NetworkSimulator(delayProb, errProb, 10, new ErrorInjector(new ErrorInjector.SingleBitError()));
+        NetworkSimulator rChannel = new NetworkSimulator(delayProb, errProb, 10, new ErrorInjector(new ErrorInjector.SingleBitError()));
         
-        ErrorInjectionStrategy strategy;
-        switch (errorStrategy) {
-            case "SingleBitError": strategy = new ErrorInjector.SingleBitError(); break;
-            case "BurstError": strategy = new ErrorInjector.BurstError(4); break;
-            default: strategy = new ErrorInjector.NoError(); break;
-        }
-
-        ErrorInjector injector = new ErrorInjector(strategy);
-        NetworkSimulator senderChannel = new NetworkSimulator(lossP, errP, 10, injector);
-        NetworkSimulator receiverChannel = new NetworkSimulator(lossP, errP, 10, new ErrorInjector(new ErrorInjector.NoError())); // usually acks just get dropped/delayed
-
-        Sender sender = null;
         Receiver receiver = null;
-
-        if (protocolName.equals("Stop and Wait")) {
-            sender = new StopAndWaitSender(senderPort, "127.0.0.1", receiverPort, senderChannel);
-            receiver = new StopAndWaitReceiver(receiverPort, receiverChannel);
-        } else if (protocolName.equals("Go-Back-N")) {
-            sender = new GoBackNSender(senderPort, "127.0.0.1", receiverPort, senderChannel, 4);
-            receiver = new GoBackNReceiver(receiverPort, receiverChannel);
-        } else if (protocolName.equals("Selective Repeat")) {
-            sender = new SelectiveRepeatSender(senderPort, "127.0.0.1", receiverPort, senderChannel, 4);
-            receiver = new SelectiveRepeatReceiver(receiverPort, receiverChannel, 4);
-        }
-
+        if (type.equals("SAW")) receiver = new StopAndWaitReceiver(rPort, rChannel);
+        else if (type.equals("GBN")) receiver = new GoBackNReceiver(rPort, rChannel);
+        else if (type.equals("SR")) receiver = new SelectiveRepeatReceiver(rPort, rChannel, windowSize);
         receiver.startListening();
-        sender.startListening();
-
-        long startTime = System.currentTimeMillis();
-        Sender finalSender = sender;
-        Thread senderThread = new Thread(() -> {
-            try {
-                finalSender.Send(data);
-            } catch (Exception e) {}
-        });
         
+        int sPort = portCounter++;
+        Sender senderTemp = null;
+        if (type.equals("SAW")) senderTemp = new StopAndWaitSender(sPort, "127.0.0.1", receiver.getLocalPort(), sChannel);
+        else if (type.equals("GBN")) senderTemp = new GoBackNSender(sPort, "127.0.0.1", receiver.getLocalPort(), sChannel, windowSize);
+        else if (type.equals("SR")) senderTemp = new SelectiveRepeatSender(sPort, "127.0.0.1", receiver.getLocalPort(), sChannel, windowSize);
+        final Sender sender = senderTemp;
+        sender.startListening();
+        
+        long start = System.currentTimeMillis();
+        Thread senderThread = new Thread(() -> {
+            try { sender.Send(data); } catch (Exception e) {}
+        });
         senderThread.start();
         senderThread.join();
+        Thread.sleep(100); 
         
-        // Wait for last acks
-        Thread.sleep(1000);
-        long totalTime = System.currentTimeMillis() - startTime - 1000;
+        long end = System.currentTimeMillis();
+        int totalTransmitted = sChannel.totalPacketsTransmitted;
+        double efficiency = (double) data.length / totalTransmitted * 100.0;
+        long avgRTT = sender.rttSamples > 0 ? sender.totalRTT / sender.rttSamples : 0;
+        
+        String result = String.format("%-25s | Efficiency: %5.1f%% | Avg RTT: %3d ms | Time: %4d ms", name, efficiency, avgRTT, (end - start));
+        out.println(result);
+        System.out.println("Done! (" + (end - start) + " ms)");
         
         sender.close();
         receiver.close();
-
-        // Calculate metrics
-        int usefulFrames = data.length;
-        int totalTx = senderChannel.totalPacketsTransmitted;
-        double efficiency = totalTx == 0 ? 0 : (double) usefulFrames / totalTx * 100;
-        long avgRtt = sender.rttSamples == 0 ? 0 : sender.totalRTT / sender.rttSamples;
-        
-        writer.printf("Protocol: %-18s | Time Taken: %4d ms | Avg RTT: %3d ms | Eff: %5.2f%% | Retransmissions: %d\n", 
-            protocolName, totalTime, avgRtt, efficiency, sender.totalRetransmissions);
-        writer.flush();
-    }
-    
-    private static byte[][] generateData(int frames) {
-        byte[][] data = new byte[frames][];
-        for (int i = 0; i < frames; i++) {
-            data[i] = ("Payload Data " + i).getBytes();
-        }
-        return data;
     }
 }

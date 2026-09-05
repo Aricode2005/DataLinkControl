@@ -1,10 +1,8 @@
 package com.network.protocol;
-
 import com.network.model.Ack;
 import com.network.model.Frame;
 import com.network.sender.Sender;
 import com.network.util.NetworkSimulator;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,25 +22,34 @@ public class GoBackNSender extends Sender {
     @Override
     public void Send(byte[][] dataChunks) throws Exception {
         for (int i = 0; i < dataChunks.length; i++) {
-            frames.add(Framing(i, dataChunks[i])); // In real GBN seq number wraps, but for sim we can just use index
+            frames.add(Framing(i % Frame.MAX_SEQ, dataChunks[i])); 
         }
-        
         while (base < frames.size()) {
             synchronized (lock) {
                 while (nextSeqNum < base + windowSize && nextSeqNum < frames.size()) {
-                    System.out.println("[Sender-GBN] Sending frame " + nextSeqNum);
+                    System.out.println("[Sender-GBN] Sending frame " + (nextSeqNum % Frame.MAX_SEQ));
                     Frame f = frames.get(nextSeqNum);
                     Channel(f);
                     if (base == nextSeqNum) {
-                        Timer(base);
+                        Timer(base % Frame.MAX_SEQ);
                     }
                     nextSeqNum++;
                 }
-                
-                lock.wait(currentTimeoutMs); // wait for ACKs or timeout
+                lock.wait(currentTimeoutMs);
             }
         }
         System.out.println("[Sender-GBN] All frames sent successfully.");
+    }
+
+    private int getAbsoluteAck(int ackNo, int base) {
+        int baseMod = base % Frame.MAX_SEQ;
+        int diff = ackNo - baseMod;
+        if (diff <= 0) diff += Frame.MAX_SEQ;
+        int abs = base + diff;
+        if (abs > base + windowSize) {
+            abs -= Frame.MAX_SEQ;
+        }
+        return abs;
     }
 
     @Override
@@ -50,14 +57,15 @@ public class GoBackNSender extends Sender {
         System.out.println("[Sender-GBN] Received " + ack);
         synchronized (lock) {
             int ackNo = ack.getAckNo();
-            if (ackNo > base) {
-                updateRTT();
-                base = ackNo;
-                stopTimer(base); // although base has moved, we might need to restart timer if base < nextSeqNum
+            int absAckNo = getAbsoluteAck(ackNo, base);
+            if (absAckNo > base && absAckNo <= nextSeqNum) {
+                Timeout();
+                stopTimer(base % Frame.MAX_SEQ); 
+                base = absAckNo;
                 if (base < nextSeqNum) {
-                    Timer(base);
+                    Timer(base % Frame.MAX_SEQ);
                 }
-                lock.notifyAll(); // wake up sending thread
+                lock.notifyAll();
             }
         }
     }
@@ -65,9 +73,11 @@ public class GoBackNSender extends Sender {
     @Override
     protected void handleTimeout(int seqNo) {
         synchronized (lock) {
-            System.out.println("[Sender-GBN] Timeout for frame " + base + ", retransmitting window.");
-            nextSeqNum = base;
-            lock.notifyAll(); // Wake up to retransmit
+            if (seqNo == base % Frame.MAX_SEQ) {
+                System.out.println("[Sender-GBN] Timeout for window base " + (base % Frame.MAX_SEQ) + ", retransmitting window.");
+                nextSeqNum = base;
+                lock.notifyAll();
+            }
         }
     }
 }

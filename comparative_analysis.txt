@@ -1,0 +1,61 @@
+=== Data Link Layer Comparative Analysis ===
+Sequence Space (m-bits): 4, MAX_SEQ: 16
+
+--- 1. Base Case (0% Error, 0% Delay) ---
+Stop-and-Wait             | Efficiency:  96.8% | Avg RTT:   9 ms | Time:  445 ms
+Go-Back-N (N=7)           | Efficiency: 100.0% | Avg RTT:   4 ms | Time:  239 ms
+Selective Repeat (N=7)    | Efficiency: 100.0% | Avg RTT:   1 ms | Time:  246 ms
+
+--- 2. Efficiency vs Error Probability (0% Delay) ---
+
+[Error Probability: 0.1]
+Stop-and-Wait             | Efficiency:  83.3% | Avg RTT:  40 ms | Time: 1348 ms
+Go-Back-N (N=7)           | Efficiency:  68.2% | Avg RTT:  95 ms | Time: 2496 ms
+Selective Repeat (N=7)    | Efficiency:  81.1% | Avg RTT:   8 ms | Time: 2843 ms
+
+[Error Probability: 0.2]
+Stop-and-Wait             | Efficiency:  76.9% | Avg RTT: 596 ms | Time: 18061 ms
+Go-Back-N (N=7)           | Efficiency:  61.2% | Avg RTT:  87 ms | Time: 2141 ms
+Selective Repeat (N=7)    | Efficiency:  68.2% | Avg RTT:  74 ms | Time: 17215 ms
+
+[Error Probability: 0.3]
+Stop-and-Wait             | Efficiency:  52.6% | Avg RTT: 4354 ms | Time: 130778 ms
+Go-Back-N (N=7)           | Efficiency:  56.6% | Avg RTT:  85 ms | Time: 2363 ms
+Selective Repeat (N=7)    | Efficiency:  58.8% | Avg RTT: 654 ms | Time: 30460 ms
+
+[Error Probability: 0.4]
+Stop-and-Wait             | Efficiency:  52.6% | Avg RTT: 4450 ms | Time: 133661 ms
+Go-Back-N (N=7)           | Efficiency:  54.5% | Avg RTT: 198 ms | Time: 4294 ms
+Selective Repeat (N=7)    | Efficiency:  51.7% | Avg RTT: 481 ms | Time: 34569 ms
+
+[Error Probability: 0.5]
+Stop-and-Wait             | Efficiency:  41.1% | Avg RTT: 7455 ms | Time: 223831 ms
+Go-Back-N (N=7)           | Efficiency:  51.7% | Avg RTT: 229 ms | Time: 4966 ms
+Selective Repeat (N=7)    | Efficiency:  37.0% | Avg RTT: 1378 ms | Time: 66354 ms
+
+--- 3. Efficiency vs Delay Probability (0% Error) ---
+
+[Delay Probability: 0.1]
+Stop-and-Wait             | Efficiency:  81.1% | Avg RTT: 296 ms | Time: 9657 ms
+Go-Back-N (N=7)           | Efficiency:  41.7% | Avg RTT: 351 ms | Time: 10309 ms
+Selective Repeat (N=7)    | Efficiency:  63.8% | Avg RTT: 224 ms | Time: 8705 ms
+
+[Delay Probability: 0.2]
+Stop-and-Wait             | Efficiency:  83.3% | Avg RTT: 548 ms | Time: 18095 ms
+Go-Back-N (N=7)           | Efficiency:  41.7% | Avg RTT: 580 ms | Time: 16358 ms
+Selective Repeat (N=7)    | Efficiency:  66.7% | Avg RTT: 243 ms | Time: 7697 ms
+
+[Delay Probability: 0.3]
+Stop-and-Wait             | Efficiency:  83.3% | Avg RTT: 657 ms | Time: 21005 ms
+Go-Back-N (N=7)           | Efficiency:  55.6% | Avg RTT: 419 ms | Time: 11874 ms
+Selective Repeat (N=7)    | Efficiency:  73.2% | Avg RTT: 409 ms | Time: 19044 ms
+
+[Delay Probability: 0.4]
+Stop-and-Wait             | Efficiency:  83.3% | Avg RTT: 655 ms | Time: 19921 ms
+Go-Back-N (N=7)           | Efficiency:  46.2% | Avg RTT: 897 ms | Time: 26153 ms
+Selective Repeat (N=7)    | Efficiency:  62.5% | Avg RTT: 456 ms | Time: 22346 ms
+
+[Delay Probability: 0.5]
+Stop-and-Wait             | Efficiency:  85.7% | Avg RTT: 952 ms | Time: 29327 ms
+Go-Back-N (N=7)           | Efficiency:  50.0% | Avg RTT: 897 ms | Time: 25027 ms
+Selective Repeat (N=7)    | Efficiency:  69.8% | Avg RTT: 1388 ms | Time: 31136 ms
