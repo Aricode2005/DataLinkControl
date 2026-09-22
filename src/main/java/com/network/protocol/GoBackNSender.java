@@ -59,6 +59,7 @@ public class GoBackNSender extends Sender {
             int ackNo = ack.getAckNo();
             int absAckNo = getAbsoluteAck(ackNo, base);
             if (absAckNo > base && absAckNo <= nextSeqNum) {
+                totalCumulativeAcks++; // TRACKING: Valid Cumulative ACK
                 Timeout();
                 stopTimer(base % Frame.MAX_SEQ); 
                 base = absAckNo;

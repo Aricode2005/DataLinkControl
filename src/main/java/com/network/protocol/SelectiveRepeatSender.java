@@ -59,6 +59,7 @@ public class SelectiveRepeatSender extends Sender {
             int ackNoMod = ack.getAckNo();
             int absAckNo = getAbsoluteSeq(ackNoMod, base);
             if (ack.isNak()) {
+                totalNaksReceived++; // TRACKING: NAK received
                 if (absAckNo >= base && absAckNo < nextSeqNum && !acked[absAckNo]) {
                     System.out.println("[Sender-SR] Received NAK for " + (absAckNo % Frame.MAX_SEQ) + ", retransmitting.");
                     try {

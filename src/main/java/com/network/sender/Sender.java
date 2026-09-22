@@ -24,6 +24,8 @@ public abstract class Sender {
     public long totalRTT = 0;
     public int rttSamples = 0;
     public long simulationStartTime = 0;
+    public int totalCumulativeAcks = 0;
+    public int totalNaksReceived = 0;
     public long simulationEndTime = 0;
     public static final long MAX_LIFETIME = 2500;
 

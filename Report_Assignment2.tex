@@ -1,4 +1,4 @@
-﻿\documentclass[12pt]{article}
+\documentclass[12pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[a4paper, margin=1in]{geometry}
 \usepackage{graphicx}
@@ -63,7 +63,7 @@
     {\Large\bfseries College: Jadavpur University\par}
     \vspace{1.5cm}
     
-    {\normalsize\bfseries GitHub Repository: \url{https://github.com/Aricode2005/DataLinkControl}\par}
+    {\normalsize\bfseries GitHub Repository: \url{https://github.com/Aricode2005/CN-LAB}\par}
     
     \vfill
 \end{titlepage}
@@ -134,118 +134,185 @@ The system must implement \textbf{Stop-and-Wait}, \textbf{Go-Back-N (GBN)}, and 
 \section{System Architecture and Methodology}
 The software architecture is developed in Java, utilizing multithreaded POSIX-style Socket Programming. To successfully simulate an unreliable physical layer (like a noisy Ethernet cable or wireless signal) over a perfectly reliable TCP socket, we implemented a custom \texttt{NetworkSimulator} middleware.
 
+\subsection{Multithreading and Synchronization}
+Because network packets can arrive at any arbitrary millisecond, the application requires parallel execution. The architecture relies on three tightly choreographed threads managed through Java's Wait/Notify synchronization paradigm on an intrinsic intrinsic \texttt{lock} monitor:
+\begin{enumerate}
+    \item \textbf{The Main Thread (Transmitter):} Executes the \texttt{Send()} method. It slices the file into frames, pushes them onto the physical wire, and calls \texttt{lock.wait()} to willingly put itself to sleep while waiting for an ACK.
+    \item \textbf{The Listener Thread (Receiver Engine):} A background \texttt{Thread} running an infinite \texttt{socket.receive()} loop. When it hears an ACK arrive, it temporarily grabs the \texttt{lock}, updates the window sliding variables safely, and yells \texttt{lock.notifyAll()} to instantaneously wake up the sleeping Main Thread.
+    \item \textbf{The Timer Thread (Alarm Clock):} Managed by \texttt{java.util.Timer}. If a timer expires before an ACK arrives, this thread grabs the \texttt{lock}, resets the window pointers to trigger a retransmission, and calls \texttt{notifyAll()} to wake the Main Thread.
+\end{enumerate}
+
 \subsection{Sequence Number Space and Modulo Arithmetic}
 In physical network hardware, frame headers are strictly limited by bit-size. For this implementation, the sequence number bit-size ($m$) is fixed to \textbf{4 bits}. This yields a maximum sequence space of $2^4 = 16$, meaning the physical sequence numbers stamped on the frames cycle exclusively from 0 through 15. 
 
-Both the Sender and Receiver maintain absolute integer indices logically in memory to track their position in the file, but they intentionally wrap the physical sequence numbers inside the frame headers using modulo arithmetic: \texttt{seqNo \% 16}. This accurately simulates the hardware limitation and forces the ARQ protocols to deal with the complexities of sequence wrap-around.
+Both the Sender and Receiver maintain absolute integer indices logically in memory to track their position in the file, but they intentionally wrap the physical sequence numbers inside the frame headers using modulo arithmetic: \texttt{seqNo \% 16}. This accurately simulates the hardware limitation and forces the ARQ protocols to deal with the complexities of sequence wrap-around math.
 
 \subsection{The Network Simulator and Deep-Clone Error Injection}
-The \texttt{NetworkSimulator} intercepts every frame before it hits the TCP socket. Based on the user-defined \texttt{errorProbability}, it may choose to invoke the \texttt{ErrorInjector} to mutate the payload bits. 
+The \texttt{NetworkSimulator} intercepts every frame before it hits the socket. Based on the user-defined \texttt{errorProbability} and \texttt{delayProbability}, it executes two completely independent probabilistic dice rolls:
 
-A critical architectural challenge in Java is that objects are passed by reference. If the simulator mutates the \texttt{Frame} object directly, it will corrupt the Sender's local memory, meaning subsequent retransmissions would be permanently corrupted. To solve this, the simulator utilizes \textbf{Deep Cloning via Object Serialization} to create a detached replica of the frame. It injects the bit-errors exclusively into the clone, ensuring the Sender's local buffer remains pristine for future retransmissions.
+A critical architectural challenge in Java is that objects are passed by reference. If the simulator mutates the \texttt{Frame} object directly, it will corrupt the Sender's local memory buffer, meaning any subsequent retransmissions would be permanently broken. To solve this, the simulator utilizes \textbf{Deep Cloning via Object Serialization} to create a detached, disposable replica of the frame. It injects the bit-errors exclusively into the clone, preserving the integrity of the Sender's original frame memory.
 
-\subsection{Simulating Packet Loss via Extreme Latency}
-Rather than simply deleting \texttt{Frame} objects from memory, this implementation takes a highly realistic approach to packet loss: \textbf{Extreme Latency}. 
-The simulator dynamically injects random thread sleeps (delays up to 2000 ms) based on \texttt{delayProbability}. 
-To simulate a packet that gets lost in routing, the Receiver evaluates a \texttt{MAX\_LIFETIME} threshold (set to 2500 ms) against the packet's embedded transmission timestamp. If a packet is delayed by the simulator beyond this threshold, the Receiver actively discards it upon arrival, successfully triggering a timeout at the Sender.
-
-\begin{lstlisting}[language=Java, caption=NetworkSimulator Core Logic]
-public void sendWithSimulation(DatagramSocket socket, Object obj, InetAddress address, int port) throws IOException {
-    // 1. Deep Clone via Serialization to protect Sender's memory
+\begin{lstlisting}[language=Java, caption=NetworkSimulator Independent Dice Rolls]
+public void sendWithSimulation(...) throws IOException {
+    // 1. Deep Clone via Serialization to protect Sender's physical memory
     byte[] data = serialize(obj);
     
-    // 2. Inject Bit-Errors probabilistically
+    // 2. ERROR DICE ROLL: Inject Bit-Errors probabilistically
     if (!isRetransmission && random.nextDouble() < errorProbability) {
         Object clonedObj = deserialize(data);
-        errorInjector.execute(((Frame) clonedObj).getPayload());
+        errorInjector.execute(((Frame) clonedObj).getPayload()); // Flip bits
         data = serialize(clonedObj); // Repackage corrupted frame
     }
     
-    // 3. Inject Network Latency (Thread sleep)
+    // 3. DELAY DICE ROLL: Inject Network Latency (Thread sleep)
     int delay = 0;
     if (!isRetransmission && random.nextDouble() < delayProbability) {
-        delay = maxDelayMs + random.nextInt(2000);
+        delay = maxDelayMs + random.nextInt(2000); // Massive delay up to 2.01 seconds
         Thread.sleep(delay);
     }
     
     // 4. Transmit over Socket
-    DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
-    socket.send(packet);
+    socket.send(new DatagramPacket(data, data.length, address, port));
 }
 \end{lstlisting}
+*(Note: As a smart design choice, if the simulator detects that a packet is a \texttt{isRetransmission}, it bypasses both dice rolls to prevent the simulation from trapping the protocol in an infinite loop of bad luck).*
+
+\subsection{Simulating Packet Loss via Extreme Latency}
+Rather than simply deleting \texttt{Frame} objects from memory, this implementation takes a highly realistic approach to packet loss: \textbf{Extreme Latency}. Right before the Sender pushes a frame onto the physical wire, it explicitly stamps it with the absolute current clock time (\texttt{System.currentTimeMillis()}).
+When the Receiver gets the frame, it calculates the transit delta. If the delta is greater than a strict \texttt{MAX\_LIFETIME} (set to 2500 ms), the Receiver realizes the packet was trapped in a slow router by the simulator. The Receiver actively throws the old packet in the trash, successfully simulating a true packet drop and forcing the Sender's timer to expire.
 
 \section{Protocol Implementations}
 
 \subsection{Stop-and-Wait ARQ}
-Stop-and-Wait is the most rudimentary flow control mechanism. The sender transmits a single frame and completely halts execution, waiting for an ACK before proceeding. The sequence number alternates exclusively between 0 and 1 ($m=1$). While implementation is trivial and memory footprint is minimal, it suffers from catastrophic inefficiency on links with high propagation delay, as the channel remains idle for the vast majority of the round-trip time.
+Stop-and-Wait is the most rudimentary flow control mechanism. The sender transmits exactly one frame and completely halts execution, waiting for an ACK before proceeding. The sequence number alternates exclusively between 0 and 1 ($m=1$). 
 
-\begin{lstlisting}[language=Java, caption=Stop-and-Wait Sender Thread Locking]
+The \texttt{Send} loop acts as a \textbf{Retransmission Loop}. By setting \texttt{waitingForAck = true} before the loop, we guarantee it enters the block. It transmits the frame and then puts the Main Thread to sleep via \texttt{lock.wait()}. If the timer expires, the thread wakes up, hits the bottom of the loop, and goes back to the top. Because \texttt{waitingForAck} is still true, the loop repeats, actively retransmitting the exact same frame!
+
+\begin{lstlisting}[language=Java, caption=Stop-and-Wait Retransmission Loop]
 public void Send(byte[][] dataChunks) throws Exception {
-    int seqNo = 0;
     for (byte[] data : dataChunks) {
-        seqNo = (seqNo + 1) % 2; 
+        seqNo = (seqNo + 1) % 2; // Sequence number strictly alternates 0, 1, 0, 1
         currentFrame = Framing(seqNo, data);
-        sendCurrentFrame();
         
-        synchronized (lock) {
-            // Halt main thread until the Receiver's ACK thread calls notify()
-            while (waitingForAck) {
-                lock.wait(currentTimeoutMs); 
-                if (waitingForAck) {
-                    // Timeout elapsed, retransmit packet
-                    sendCurrentFrame();
-                }
+        waitingForAck = true;
+        while (waitingForAck) {  // The Retransmission Loop
+            Channel(currentFrame); // Send the frame
+            Timer(seqNo);          // Start the clock
+            
+            synchronized (lock) {
+                lock.wait(currentTimeoutMs); // The algorithm STOPS and WAITS right here.
             }
         }
     }
 }
 \end{lstlisting}
 
-\subsection{Go-Back-N (GBN) ARQ}
-Go-Back-N dramatically improves channel utilization by employing a \textbf{Sliding Window} of size $N$. The sender pipelines up to $N$ unacknowledged frames into the network consecutively. The receiver's window size remains exactly 1; it strictly expects in-order delivery and discards any out-of-sequence frames, sending cumulative acknowledgments. If a timeout occurs at the sender, it assumes all unacknowledged frames were lost, resetting its pointer and retransmitting the entire window starting from the unacknowledged \texttt{base}.
+When a valid ACK finally arrives at the Listener Thread, the background thread forces the `while` condition to become false and explicitly wakes up the Main Thread, terminating the retransmission cycle.
+\begin{lstlisting}[language=Java, caption=Stop-and-Wait Success Notification]
+protected void Recv(Ack ack) {
+    if (ack.getAckNo() == (seqNo + 1) % 2) { 
+        waitingForAck = false; // Break the Retransmission Loop
+        lock.notifyAll(); // Wake up the sleeping Main Thread
+    }
+}
+\end{lstlisting}
 
-\begin{lstlisting}[language=Java, caption=Go-Back-N Timeout and Window Management]
+\subsection{Go-Back-N (GBN) ARQ}
+Go-Back-N dramatically improves channel utilization by employing a \textbf{Sliding Window} of size $N$. The sender pipelines up to $N$ unacknowledged frames into the network consecutively. 
+
+\subsubsection{Strict Reception and Cumulative ACKs}
+The Receiver window is strictly `1`, meaning it refuses out-of-order packets. It expects packets sequentially. If it gets Frame 0, it asks for Frame 1 by sending \texttt{ACK 1}. If it receives Frame 3 instead of 1, it drops Frame 3 and stubbornly sends \texttt{ACK 1} again.
+
+On the Sender side, ACKs are interpreted \textbf{Cumulatively}. If the Sender receives \texttt{ACK 4}, the mathematical logic inherently verifies that Frames 0, 1, 2, and 3 must have all been successfully received (even if the individual ACKs for 0, 1, and 2 were utterly destroyed in transit). The sender instantly slides its base to 4.
+
+\begin{lstlisting}[language=Java, caption=Go-Back-N Sender Cumulative ACK Logic]
+protected void Recv(Ack ack) {
+    int ackNo = ack.getAckNo();
+    int absAckNo = getAbsoluteAck(ackNo, base); // Solve Modulo wrap-around
+    
+    // CUMULATIVE LOGIC: Any valid ACK slides the window covering all prior frames
+    if (absAckNo > base && absAckNo <= nextSeqNum) {
+        Timeout(); // Calculate dynamic RTT
+        base = absAckNo; // Slide the base forward!
+        lock.notifyAll();
+    }
+}
+\end{lstlisting}
+
+\subsubsection{The Modulo Mapping Problem}
+Because physical sequence numbers wrap from 15 back to 0, if the sender receives an \texttt{ACK 2}, it doesn't know if that means logical array index 2, 18, or 34. To slide the window, we must dynamically calculate the \textit{Absolute Sequence Number} based on where the current window is resting.
+
+\begin{lstlisting}[language=Java, caption=Resolving Sequence Wrap-Around]
+private int getAbsoluteAck(int ackNo, int base) {
+    int baseMod = base % Frame.MAX_SEQ;
+    int diff = ackNo - baseMod;
+    if (diff <= 0) diff += Frame.MAX_SEQ; // Calculate forward wrapping difference
+    
+    int abs = base + diff;
+    if (abs > base + windowSize) {
+        abs -= Frame.MAX_SEQ; // Ignore ancient, erroneously delayed ACKs
+    }
+    return abs;
+}
+\end{lstlisting}
+
+\subsubsection{The Timeout Punishment}
+If a timeout occurs at the sender, it assumes all unacknowledged frames were lost. The Timer Thread ruthlessly resets the transmission pointer (\texttt{nextSeqNum}) all the way back to the oldest unacknowledged frame (\texttt{base}). When the Main Thread wakes up, its loop condition immediately begins retransmitting the entire window from scratch.
+
+\begin{lstlisting}[language=Java, caption=Go-Back-N Timeout Punishment]
 protected void handleTimeout(int seqNo) {
-    synchronized (lock) {
-        if (seqNo == base % Frame.MAX_SEQ) {
-            System.out.println("[GBN] Timeout for base " + base + ". Retransmitting entire window.");
-            // Reset the transmission pointer back to the unacknowledged base
-            nextSeqNum = base; 
-            lock.notifyAll(); // Wake up the sending thread to push the window again
-        }
+    if (seqNo == base % Frame.MAX_SEQ) {
+        // Reset the transmission pointer all the way back to the base
+        nextSeqNum = base; 
+        lock.notifyAll(); // Main Thread wakes up and resends entire window
     }
 }
 \end{lstlisting}
 
 \subsection{Selective Repeat (SR) ARQ}
-Selective Repeat maximizes theoretical efficiency on noisy channels by decoupling the sender and receiver windows. The receiver utilizes a window size of $N$ and maintains an internal buffer (using a Java \texttt{HashMap}) to accept and temporarily store out-of-order frames. It explicitly sends independent ACKs (and optionally NAKs). 
-The sender assigns an independent logical timer to every single frame in the transmission window. If a timeout occurs, the sender surgically retransmits only the specific frame that failed, rather than punishing the network by retransmitting the entire window.
+Selective Repeat maximizes theoretical efficiency on noisy channels by decoupling the sender and receiver windows. The receiver utilizes a window size of $N$ and maintains an internal buffer (using a Java \texttt{HashMap}) to accept and temporarily store out-of-order frames.
 
-\begin{lstlisting}[language=Java, caption=Selective Repeat Receiver Out-of-Order Buffering]
-int absSeqNo = getAbsoluteSeq(seqNoMod, base);
+\subsubsection{Independent Timers and NAKs}
+Unlike GBN, which only times the oldest frame, the SR Sender starts an **Independent Timer** for every single frame. If the Receiver detects a corrupted frame, it immediately fires back an explicit **NAK** (Negative Acknowledgement). The Sender bypasses the timer entirely, performing a surgical strike to retransmit only the broken frame.
 
-// Check if frame falls within the active receiver window
-if (absSeqNo >= base && absSeqNo < base + windowSize) {
-    // Buffer the out-of-order frame
-    buffer.put(absSeqNo, frame);
-    Send(seqNoMod, false); // Transmit Independent ACK
-    
-    // Slide window forward if the expected base frame has arrived
+\begin{lstlisting}[language=Java, caption=Selective Repeat Receiver NAK and Buffering]
+// Inside SelectiveRepeatReceiver.java
+if (!Check(frame)) {
+    Send(seqNo, true); // Send explicit NAK (true = isNak)
+    return;
+}
+
+// Out-Of-Order Buffering Logic
+if (seqNo >= base && seqNo < base + windowSize) {
+    buffer.put(seqNo, frame); // Save out-of-order frame in memory
+    Send(seqNo, false);       // Send Independent ACK
+
+    // Slide window forward ONLY if the base contiguous frame arrived
     while (buffer.containsKey(base)) {
-        Frame f = buffer.remove(base);
-        deliverDataToApplication(f.getPayload());
+        deliverDataToApplication(buffer.remove(base).getPayload());
         base++;
     }
+}
+\end{lstlisting}
+
+\subsubsection{The "Ghost Frame" Re-ACKing Rule}
+A critical edge-case occurs when the Receiver successfully processes Frame 0 and sends \texttt{ACK 0}, but \texttt{ACK 0} gets lost in the network. The Sender's timer for Frame 0 will eventually expire, and the Sender will redundantly retransmit Frame 0. When that old Frame 0 hits the Receiver, it falls \textit{behind} the Receiver's current window. If the Receiver ignores it, the Sender will be trapped waiting forever. Thus, the Receiver must actively re-ACK old duplicates to rescue the stuck Sender.
+
+\begin{lstlisting}[language=Java, caption=Selective Repeat Ghost Frame Rescue]
+// If the frame sequence is older than our current base window...
+} else if (seqNo >= base - windowSize && seqNo < base) {
+    // Send a duplicate ACK so the Sender's expired timer stops!
+    Send(seqNo, false); 
 }
 \end{lstlisting}
 
 
 \section{Experimental Evaluation and Results}
 To scientifically evaluate the protocols, an automated \texttt{TestRunner} was executed under a 30-frame payload transmission. 
-\textbf{Efficiency} is defined mathematically as the ratio of actual application frames delivered to the total number of frames physically transmitted across the network (including all redundant retransmissions).
+\textbf{Efficiency} is calculated as the ratio of actual original application frames to the total number of frames physically transmitted across the network (including all redundant retransmissions). The formula is strictly $\frac{Original}{Total Transmitted} \times 100$.
 
 \subsection{Base Case (0\% Error, 0\% Delay)}
-Under perfect, ideal network conditions (no interference), pipelined protocols vastly outperform Stop-and-Wait, approaching 100\% efficiency with near-zero latency, as the channel is constantly saturated with data.
+Under perfect, ideal network conditions (no interference), pipelined protocols vastly outperform Stop-and-Wait, approaching 100\% efficiency. By calculating the difference between the frame timestamp and ACK reception time, we observe that Stop-and-Wait suffers the worst Average Round-Trip Time (RTT) because it sits completely idle between frames, whereas pipelined protocols aggressively overlap their propagation times.
 
 \begin{table}[H]
 \centering
@@ -420,7 +487,7 @@ SR                & 8                      & 81.1\%                   & 3 ms    
     \caption{Average RTT as Window Size Scales}
 \end{figure}
 
-The empirical data demonstrates a counter-intuitive principle: for Go-Back-N, expanding the window size actually \textit{decreases} efficiency on noisy channels. This is because a larger window means more frames are pipelined into the network; when a single error occurs, the massive number of pipelined frames are all subsequently discarded and must be retransmitted, creating a severe penalty. Selective Repeat completely bypasses this penalty, maintaining robust efficiency regardless of how large the window scales.
+The empirical data demonstrates a counter-intuitive principle: for Go-Back-N, expanding the window size actually \textit{decreases} efficiency and creates massive RTT spikes on noisy channels. This is because a larger window means more frames are pipelined into the network; when a single error occurs, the massive number of pipelined frames are all subsequently discarded and must be retransmitted, creating a severe penalty. Selective Repeat avoids this penalty, maintaining flat RTTs and robust efficiency regardless of how large the window scales.
 
 \section{Window Failures and Mathematical Limits}
 ARQ protocols mathematically depend on the sequence number space ($2^m$). The sequence numbers embedded in the physical frames act as the only logical compass the receiver has. If the sender's window size ($N$) violates strict mathematical boundaries relative to the sequence space, severe logic errors occur at the Data Link Layer, specifically resulting in the \textbf{Erroneous Acceptance} of old, delayed packets.

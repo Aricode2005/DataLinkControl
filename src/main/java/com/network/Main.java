@@ -104,6 +104,11 @@ public class Main {
             System.out.println("Total Frames Delayed: " + channel.totalPacketsDelayed);
             System.out.println("Total Bytes: " + totalBytes);
             System.out.println("Total Retransmissions: " + sender.totalRetransmissions);
+            if (protocol.equals("GBN")) {
+                System.out.println("Cumulative ACKs Received: " + sender.totalCumulativeAcks);
+            } else if (protocol.equals("SR")) {
+                System.out.println("NAKs Received: " + sender.totalNaksReceived);
+            }
             System.out.println("Total Time Required: " + (end - start) + " ms");
             System.out.println("=========================\n");
             
