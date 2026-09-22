@@ -18,6 +18,7 @@ public class StopAndWaitReceiver extends Receiver {
         if (frame.getSeqNo() == expectedSeqNo) {
             log("[Receiver-SAW] Frame accepted: " + new String(frame.getPayload()));
             statBytesReceived += frame.getPayload().length;
+            try { finalDocument.write(frame.getPayload()); } catch(Exception e){}
             expectedSeqNo = (expectedSeqNo + 1) % 2;
         } else {
             log("[Receiver-SAW] Duplicate frame received.");

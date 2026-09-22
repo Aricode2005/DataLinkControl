@@ -22,6 +22,7 @@ public class GoBackNReceiver extends Receiver {
         if (seqNo == (expectedSeqNo % Frame.MAX_SEQ)) {
             log("[Receiver-GBN] Frame accepted: " + new String(frame.getPayload()));
             statBytesReceived += frame.getPayload().length;
+            try { finalDocument.write(frame.getPayload()); } catch(Exception e){}
             expectedSeqNo++;
         } else {
             log("[Receiver-GBN] Out of order frame, expected " + (expectedSeqNo % Frame.MAX_SEQ) + ", got " + seqNo);

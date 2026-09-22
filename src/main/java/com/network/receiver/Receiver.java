@@ -20,6 +20,7 @@ public abstract class Receiver {
     public int statBytesReceived = 0;
     public long statStartTime = 0;
     public long statEndTime = 0;
+    public java.io.ByteArrayOutputStream finalDocument = new java.io.ByteArrayOutputStream();
     
     protected com.network.util.logger.Logger logger = new com.network.util.logger.ConsoleLogger();
 

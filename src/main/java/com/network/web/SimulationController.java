@@ -120,6 +120,7 @@ public class SimulationController {
                     rLog.log("Total Bytes Received/Delivered: " + rec.statBytesReceived);
                     rLog.log("Total Time Required: " + (rec.statEndTime - rec.statStartTime) + " ms");
                     rLog.log("===========================\n");
+                    rLog.log("=== ASSEMBLED DOCUMENT ===\n" + new String(rec.finalDocument.toByteArray()) + "\n==========================");
                     rLog.log("SIMULATION_COMPLETE");
                     rec.close();
                     activeReceivers.remove(sessionCode);

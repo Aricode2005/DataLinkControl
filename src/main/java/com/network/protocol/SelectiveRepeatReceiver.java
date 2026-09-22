@@ -54,6 +54,7 @@ public class SelectiveRepeatReceiver extends Receiver {
                 Frame f = buffer.remove(base);
                 log("[Receiver-SR] Frame " + (base % Frame.MAX_SEQ) + " accepted/delivered: " + new String(f.getPayload()));
                 statBytesReceived += f.getPayload().length;
+                try { finalDocument.write(f.getPayload()); } catch(Exception e){}
                 base++;
             }
         } else if (absSeqNo >= base - windowSize && absSeqNo < base) {
