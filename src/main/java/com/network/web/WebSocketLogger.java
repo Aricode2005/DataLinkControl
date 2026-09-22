@@ -1,6 +1,7 @@
 package com.network.web;
 
 import com.network.web.SimulationWebSocketHandler;
+import com.network.util.logger.Logger;
 
 public class WebSocketLogger implements Logger {
     private final int sessionCode;

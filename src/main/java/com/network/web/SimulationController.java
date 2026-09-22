@@ -114,9 +114,7 @@ public class SimulationController {
                     rec.statEndTime = System.currentTimeMillis();
                     WebSocketLogger rLog = new WebSocketLogger(sessionCode, false);
                     rLog.log("\n=== RECEIVER STATISTICS ===");
-                    rLog.log("Total Frames Received (inc. duplicates/corrupted): " + rec.statFramesReceived);
                     rLog.log("Total Frames Originally Received Corrupted: " + rec.statFramesCorrupted);
-                    rLog.log("Total Frames Received with Delay (Discarded): " + rec.statFramesDelayed);
                     rLog.log("Total Bytes Received/Delivered: " + rec.statBytesReceived);
                     rLog.log("Total Time Required: " + (rec.statEndTime - rec.statStartTime) + " ms");
                     rLog.log("===========================\n");
