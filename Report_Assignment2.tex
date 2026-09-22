@@ -312,7 +312,9 @@ To scientifically evaluate the protocols, an automated \texttt{TestRunner} was e
 \textbf{Efficiency} is calculated as the ratio of actual original application frames to the total number of frames physically transmitted across the network (including all redundant retransmissions). The formula is strictly $\frac{Original}{Total Transmitted} \times 100$.
 
 \subsection{Base Case (0\% Error, 0\% Delay)}
-Under perfect, ideal network conditions (no interference), pipelined protocols vastly outperform Stop-and-Wait, approaching 100\% efficiency. By calculating the difference between the frame timestamp and ACK reception time, we observe that Stop-and-Wait suffers the worst Average Round-Trip Time (RTT) because it sits completely idle between frames, whereas pipelined protocols aggressively overlap their propagation times.
+Under perfect, ideal network conditions (no interference), pipelined protocols vastly outperform Stop-and-Wait, approaching 100\% efficiency. The fundamental limitation of Stop-and-Wait is its inability to utilize the channel while waiting for an acknowledgement. Because it transmits a single frame and then halts, the network medium remains completely idle for an entire Round-Trip Time (RTT) before the next frame can be dispatched. This results in terrible bandwidth utilization. 
+
+By calculating the difference between the frame timestamp and ACK reception time, we observe that Stop-and-Wait suffers the worst Average Round-Trip Time (RTT). Conversely, Go-Back-N and Selective Repeat aggressively pipeline multiple frames. By keeping the network channel constantly saturated with data, the "Average RTT per frame" drops drastically, as the propagation times of multiple frames safely overlap in transit.
 
 \begin{table}[H]
 \centering
@@ -327,7 +329,13 @@ Selective Repeat  & 7                  & 100.0\%             & 1 ms             
 \end{table}
 
 \subsection{Efficiency vs. Error Probability}
-As the bit-error probability increases (with delay held constant at 0\%), the structural weaknesses of Stop-and-Wait and GBN become glaringly apparent. Stop-and-Wait's execution time spirals out of control due to sequential bottlenecks. Go-Back-N suffers severe efficiency penalties because a single bit-error forces the wasteful retransmission of the entire window, clogging the network with redundant data. Selective Repeat maintains the highest efficiency by surgically retransmitting only the corrupted frames.
+As the bit-error probability increases (with delay held constant at 0\%), the structural weaknesses of Stop-and-Wait and GBN become glaringly apparent. 
+
+Stop-and-Wait maintains decent \textit{frame efficiency} (because it only ever retransmits a single failed frame), but its execution time spirals out of control because the Sender must wait for a full timeout duration before recovering. 
+
+Go-Back-N suffers severe efficiency penalties due to its strict cumulative ACK logic. In GBN, if a single frame (e.g., Frame 2) is corrupted, the receiver discards it. Furthermore, because GBN refuses out-of-order packets, the receiver is forced to discard Frames 3, 4, 5, and 6, even if they arrived perfectly intact! When the sender's timer expires, it is punished with the task of retransmitting the entire window of frames from scratch. Thus, a single bit error catastrophically destroys the efficiency of the entire pipeline, clogging the network with redundant data.
+
+Selective Repeat maintains the highest efficiency by decoupling the sender and receiver. Because the SR receiver buffers subsequent correct frames and issues an explicit NAK for the corrupted frame, the sender performs a surgical strike—retransmitting \textit{only} the broken frame. SR's efficiency degrades gracefully and linearly with error probability, rather than exponentially like GBN.
 
 \begin{table}[H]
 \centering
@@ -371,7 +379,13 @@ Selective Repeat  & 81.1\% & 68.2\% & 58.8\% & 51.7\% & 37.0\% \\ \bottomrule
 \end{figure}
 
 \subsection{Efficiency vs. Delay Probability}
-Delay probability causes packets to exceed the receiver's \texttt{MAX\_LIFETIME}, triggering sender timeouts. Selective Repeat handles random delays exceptionally well due to its independent timers and out-of-order buffering. Go-Back-N performs terribly under high delay because, while the receiver discards the delayed packet, it also discards all subsequent, perfectly valid packets in the window, forcing massive cumulative retransmissions.
+Delay probability simulates packets getting temporarily trapped in network congestion, causing their transit time to exceed the receiver's \texttt{MAX\_LIFETIME} or the sender's timeout threshold.
+
+In Stop-and-Wait, a delayed ACK causes a premature timeout. The sender retransmits the frame, only for the original, delayed ACK to arrive moments later. This creates a cascade of "Ghost ACKs" that momentarily confuse the sender's sliding window, resulting in wasted transmissions.
+
+Go-Back-N performs terribly under high delay for the same reason it fails under high errors. If a packet is delayed beyond the receiver's acceptance threshold, it is dropped. Consequently, the entire pipeline collapses, and the entire window must be retransmitted. 
+
+Selective Repeat handles random delays exceptionally well. Because it relies on independent timers, if one specific packet is delayed, only that packet's timer expires. The sender retransmits it while the rest of the window continues operating smoothly. The out-of-order buffering at the receiver absorbs the delay without halting the entire data stream.
 
 \begin{table}[H]
 \centering
@@ -487,7 +501,9 @@ SR                & 8                      & 81.1\%                   & 3 ms    
     \caption{Average RTT as Window Size Scales}
 \end{figure}
 
-The empirical data demonstrates a counter-intuitive principle: for Go-Back-N, expanding the window size actually \textit{decreases} efficiency and creates massive RTT spikes on noisy channels. This is because a larger window means more frames are pipelined into the network; when a single error occurs, the massive number of pipelined frames are all subsequently discarded and must be retransmitted, creating a severe penalty. Selective Repeat avoids this penalty, maintaining flat RTTs and robust efficiency regardless of how large the window scales.
+The empirical data demonstrates a fascinating, counter-intuitive principle: \textbf{for Go-Back-N, expanding the window size on a noisy channel actually decreases overall efficiency.} This happens because a larger window enables the sender to push more frames onto the wire before requiring an ACK. If an error occurs very early in a large window, the penalty is devastating—every single subsequent frame in that massive pipeline must be dropped and retransmitted. For instance, at $N=15$, a single bit-flip could force 15 redundant retransmissions, creating massive RTT spikes and grinding bandwidth efficiency to a halt.
+
+Conversely, Selective Repeat demonstrates a flat, robust RTT topology. Because SR retransmits exclusively the corrupted frames rather than the entire window, expanding $N$ simply allows for higher pipelining concurrency without inflating the retransmission penalty. This mathematically proves that SR is fundamentally designed to maintain high bandwidth utilization over highly unstable, high-latency physical mediums.
 
 \section{Window Failures and Mathematical Limits}
 ARQ protocols mathematically depend on the sequence number space ($2^m$). The sequence numbers embedded in the physical frames act as the only logical compass the receiver has. If the sender's window size ($N$) violates strict mathematical boundaries relative to the sequence space, severe logic errors occur at the Data Link Layer, specifically resulting in the \textbf{Erroneous Acceptance} of old, delayed packets.
