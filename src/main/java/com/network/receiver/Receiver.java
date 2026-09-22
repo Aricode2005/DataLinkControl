@@ -20,6 +20,17 @@ public abstract class Receiver {
     public int statBytesReceived = 0;
     public long statStartTime = 0;
     public long statEndTime = 0;
+    
+    protected com.network.util.logger.Logger logger = new com.network.util.logger.ConsoleLogger();
+
+    public void setLogger(com.network.util.logger.Logger logger) {
+        this.logger = logger;
+    }
+
+    protected void log(String msg) {
+        if (logger != null) logger.log(msg);
+        else System.out.println(msg);
+    }
 
     public Receiver(int localPort, NetworkSimulator channel) throws Exception {
         this.socket = new DatagramSocket(localPort);
@@ -73,7 +84,7 @@ public abstract class Receiver {
                         statTotalFramesReceived++;
                         Frame f = (Frame) obj;
                         if (isTooLate(f.getTimestamp())) {
-                            System.out.println("[Receiver] Frame " + f.getSeqNo() + " arrived too late, discarded.");
+                            log("[Receiver] Frame " + f.getSeqNo() + " arrived too late, discarded.");
                             continue;
                         }
                         Recv(f);
@@ -86,13 +97,13 @@ public abstract class Receiver {
     }
     
     public void printStats() {
-        System.out.println("\n=== RECEIVER STATISTICS ===");
-        System.out.println("Total Frames Received (inc. duplicates/corrupted): " + statTotalFramesReceived);
-        System.out.println("Total Frames Originally Received Corrupted: " + statFramesCorrupted);
-        System.out.println("Total Frames Received with Delay (Discarded): " + statFramesTooLate);
-        System.out.println("Total Bytes Received/Delivered: " + statBytesReceived);
-        System.out.println("Total Time Required: " + (statEndTime - statStartTime) + " ms");
-        System.out.println("===========================\n");
+        log("\n=== RECEIVER STATISTICS ===");
+        log("Total Frames Received (inc. duplicates/corrupted): " + statTotalFramesReceived);
+        log("Total Frames Originally Received Corrupted: " + statFramesCorrupted);
+        log("Total Frames Received with Delay (Discarded): " + statFramesTooLate);
+        log("Total Bytes Received/Delivered: " + statBytesReceived);
+        log("Total Time Required: " + (statEndTime - statStartTime) + " ms");
+        log("===========================\n");
     }
 
     public void close() {

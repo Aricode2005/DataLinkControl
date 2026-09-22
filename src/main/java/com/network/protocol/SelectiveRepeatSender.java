@@ -29,7 +29,7 @@ public class SelectiveRepeatSender extends Sender {
         while (base < frames.size()) {
             synchronized (lock) {
                 while (nextSeqNum < base + windowSize && nextSeqNum < frames.size()) {
-                    System.out.println("[Sender-SR] Sending frame " + (nextSeqNum % Frame.MAX_SEQ));
+                    log("[Sender-SR] Sending frame " + (nextSeqNum % Frame.MAX_SEQ));
                     Frame f = frames.get(nextSeqNum);
                     Channel(f);
                     Timer(nextSeqNum);
@@ -38,7 +38,7 @@ public class SelectiveRepeatSender extends Sender {
                 lock.wait(100);
             }
         }
-        System.out.println("[Sender-SR] All frames sent successfully.");
+        log("[Sender-SR] All frames sent successfully.");
     }
 
     private int getAbsoluteSeq(int seqNoMod, int base) {
@@ -54,14 +54,14 @@ public class SelectiveRepeatSender extends Sender {
 
     @Override
     protected void Recv(Ack ack) {
-        System.out.println("[Sender-SR] Received " + ack);
+        log("[Sender-SR] Received " + ack);
         synchronized (lock) {
             int ackNoMod = ack.getAckNo();
             int absAckNo = getAbsoluteSeq(ackNoMod, base);
             if (ack.isNak()) {
                 totalNaksReceived++; // TRACKING: NAK received
                 if (absAckNo >= base && absAckNo < nextSeqNum && !acked[absAckNo]) {
-                    System.out.println("[Sender-SR] Received NAK for " + (absAckNo % Frame.MAX_SEQ) + ", retransmitting.");
+                    log("[Sender-SR] Received NAK for " + (absAckNo % Frame.MAX_SEQ) + ", retransmitting.");
                     try {
                         Channel(frames.get(absAckNo));
                         stopTimer(absAckNo);
@@ -86,7 +86,7 @@ public class SelectiveRepeatSender extends Sender {
     protected void handleTimeout(int seqNoAbs) {
         synchronized (lock) {
             if (seqNoAbs < acked.length && !acked[seqNoAbs]) {
-                System.out.println("[Sender-SR] Timeout for frame " + (seqNoAbs % Frame.MAX_SEQ) + ", retransmitting selectively.");
+                log("[Sender-SR] Timeout for frame " + (seqNoAbs % Frame.MAX_SEQ) + ", retransmitting selectively.");
                 try {
                     Channel(frames.get(seqNoAbs));
                     Timer(seqNoAbs); 

@@ -5,6 +5,7 @@ import com.network.receiver.Receiver;
 import com.network.sender.Sender;
 import com.network.util.NetworkSimulator;
 import com.network.util.error.ErrorInjector;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -22,7 +23,6 @@ public class SimulationController {
         NetworkSimulator channel = new NetworkSimulator(0.0, 0.0, 10, new ErrorInjector(new ErrorInjector.SingleBitError()));
         Receiver receiver = null;
         
-        // Pass 0 to let OS assign an available random port! This allows multiple concurrent users on Railway!
         if (protocol.equals("SAW")) receiver = new StopAndWaitReceiver(0, channel);
         else if (protocol.equals("GBN")) receiver = new GoBackNReceiver(0, channel);
         else if (protocol.equals("SR")) receiver = new SelectiveRepeatReceiver(0, channel, windowSize);
@@ -31,6 +31,8 @@ public class SimulationController {
         receiver.startListening();
         int sessionCode = receiver.getLocalPort();
         activeReceivers.put(sessionCode, receiver);
+        
+        receiver.setLogger(new WebSocketLogger(sessionCode, false));
         
         Map<String, Object> res = new HashMap<>();
         res.put("sessionCode", sessionCode);
@@ -53,9 +55,9 @@ public class SimulationController {
         else if (protocol.equals("GBN")) sender = new GoBackNSender(0, "127.0.0.1", sessionCode, channel, windowSize);
         else if (protocol.equals("SR")) sender = new SelectiveRepeatSender(0, "127.0.0.1", sessionCode, channel, windowSize);
         
+        sender.setLogger(new WebSocketLogger(sessionCode, true));
         sender.startListening();
         
-        // Convert string payload to data chunks
         byte[] fileBytes = payloadString.getBytes();
         int chunkSize = 20; 
         int numChunks = (int) Math.ceil((double) fileBytes.length / chunkSize);
@@ -72,40 +74,56 @@ public class SimulationController {
         final Sender finalSender = sender;
         final int finalTotalBytes = totalBytes;
         
-        // Run simulation in background so UI doesn't hang!
         new Thread(() -> {
             try {
-                System.out.println("=========================================");
-                System.out.println("Starting Simulation (" + protocol + ")");
-                System.out.println("Error: " + errorProb + " | Delay: " + delayProb);
+                WebSocketLogger log = new WebSocketLogger(sessionCode, true);
+                log.log("=========================================");
+                log.log("Starting Simulation (" + protocol + ")");
+                log.log("Error: " + errorProb + " | Delay: " + delayProb);
+                
                 long start = System.currentTimeMillis();
                 finalSender.Send(data);
                 long end = System.currentTimeMillis();
                 
-                System.out.println("\n=== SENDER STATISTICS ===");
-                System.out.println("Total Frames to Send: " + data.length);
-                System.out.println("Total Frames Sent Corrupted: " + channel.totalPacketsCorrupted);
-                System.out.println("Total Frames Delayed: " + channel.totalPacketsDelayed);
-                System.out.println("Total Bytes: " + finalTotalBytes);
-                System.out.println("Total Retransmissions: " + finalSender.totalRetransmissions);
+                long timeRequired = end - start;
+                int totalTransmitted = data.length + finalSender.totalRetransmissions;
+                double efficiency = ((double) data.length / totalTransmitted) * 100.0;
+                double avgRtt = timeRequired / (double) totalTransmitted;
+                
+                log.log("\n=== SENDER STATISTICS ===");
+                log.log("Total Frames to Send: " + data.length);
+                log.log("Total Frames Sent Corrupted: " + channel.totalPacketsCorrupted);
+                log.log("Total Frames Delayed: " + channel.totalPacketsDelayed);
+                log.log("Total Bytes: " + finalTotalBytes);
+                log.log("Total Retransmissions: " + finalSender.totalRetransmissions);
                 if (protocol.equals("GBN")) {
-                    System.out.println("Cumulative ACKs Received: " + finalSender.totalCumulativeAcks);
+                    log.log("Cumulative ACKs Received: " + finalSender.totalCumulativeAcks);
                 } else if (protocol.equals("SR")) {
-                    System.out.println("NAKs Received: " + finalSender.totalNaksReceived);
+                    log.log("NAKs Received: " + finalSender.totalNaksReceived);
                 }
-                System.out.println("Total Time Required: " + (end - start) + " ms");
-                System.out.println("=========================\n");
+                log.log("Total Time Required: " + timeRequired + " ms");
+                log.log(String.format("Average RTT: %.2f ms", avgRtt));
+                log.log(String.format("Efficiency: %.2f%%", efficiency));
+                log.log("=========================\n");
+                log.log("SIMULATION_COMPLETE");
+                
                 finalSender.close();
                 
-                // Also trigger the receiver's shutdown stats dynamically since Ctrl+C won't happen here
                 Receiver rec = activeReceivers.get(sessionCode);
                 if (rec != null) {
-                    rec.printStats();
+                    rec.statEndTime = System.currentTimeMillis();
+                    WebSocketLogger rLog = new WebSocketLogger(sessionCode, false);
+                    rLog.log("\n=== RECEIVER STATISTICS ===");
+                    rLog.log("Total Frames Received (inc. duplicates/corrupted): " + rec.statFramesReceived);
+                    rLog.log("Total Frames Originally Received Corrupted: " + rec.statFramesCorrupted);
+                    rLog.log("Total Frames Received with Delay (Discarded): " + rec.statFramesDelayed);
+                    rLog.log("Total Bytes Received/Delivered: " + rec.statBytesReceived);
+                    rLog.log("Total Time Required: " + (rec.statEndTime - rec.statStartTime) + " ms");
+                    rLog.log("===========================\n");
+                    rLog.log("SIMULATION_COMPLETE");
                     rec.close();
                     activeReceivers.remove(sessionCode);
                 }
-                
-                System.out.println("SIMULATION_COMPLETE");
             } catch (Exception e) {
                 e.printStackTrace();
             }

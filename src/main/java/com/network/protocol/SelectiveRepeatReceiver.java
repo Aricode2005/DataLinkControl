@@ -30,9 +30,9 @@ public class SelectiveRepeatReceiver extends Receiver {
     @Override
     protected void Recv(Frame frame) {
         int seqNoMod = frame.getSeqNo();
-        System.out.println("[Receiver-SR] Received frame " + seqNoMod);
+        log("[Receiver-SR] Received frame " + seqNoMod);
         if (!Check(frame)) {
-            System.out.println("[Receiver-SR] Frame corrupted, sending NAK.");
+            log("[Receiver-SR] Frame corrupted, sending NAK.");
             try {
                 Send(seqNoMod, true);
             } catch (IOException e) {
@@ -43,7 +43,7 @@ public class SelectiveRepeatReceiver extends Receiver {
 
         int absSeqNo = getAbsoluteSeq(seqNoMod, base);
         if (absSeqNo >= base && absSeqNo < base + windowSize) {
-            System.out.println("[Receiver-SR] Frame " + (absSeqNo % Frame.MAX_SEQ) + " buffered.");
+            log("[Receiver-SR] Frame " + (absSeqNo % Frame.MAX_SEQ) + " buffered.");
             buffer.put(absSeqNo, frame);
             try {
                 Send(seqNoMod, false); 
@@ -52,12 +52,12 @@ public class SelectiveRepeatReceiver extends Receiver {
             }
             while (buffer.containsKey(base)) {
                 Frame f = buffer.remove(base);
-                System.out.println("[Receiver-SR] Frame " + (base % Frame.MAX_SEQ) + " accepted/delivered: " + new String(f.getPayload()));
+                log("[Receiver-SR] Frame " + (base % Frame.MAX_SEQ) + " accepted/delivered: " + new String(f.getPayload()));
                 statBytesReceived += f.getPayload().length;
                 base++;
             }
         } else if (absSeqNo >= base - windowSize && absSeqNo < base) {
-            System.out.println("[Receiver-SR] Received duplicate frame " + (absSeqNo % Frame.MAX_SEQ) + ", re-ACKing.");
+            log("[Receiver-SR] Received duplicate frame " + (absSeqNo % Frame.MAX_SEQ) + ", re-ACKing.");
             try {
                 Send(seqNoMod, false);
             } catch (IOException e) {

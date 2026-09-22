@@ -29,6 +29,19 @@ public abstract class Sender {
     public long simulationEndTime = 0;
     public static final long MAX_LIFETIME = 2500;
 
+    protected com.network.util.logger.Logger logger = new com.network.util.logger.ConsoleLogger();
+
+    public void setLogger(com.network.util.logger.Logger logger) {
+        this.logger = logger;
+    }
+
+    protected void log(String msg) {
+        if (logger != null) logger.log(msg);
+        else System.out.println(msg);
+    }
+
+    protected final Object lock = new Object();
+
     public Sender(int localPort, String receiverIp, int receiverPort, NetworkSimulator channel) throws Exception {
         this.socket = new DatagramSocket(localPort);
         this.receiverAddress = InetAddress.getByName(receiverIp);

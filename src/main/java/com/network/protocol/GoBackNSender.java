@@ -27,7 +27,7 @@ public class GoBackNSender extends Sender {
         while (base < frames.size()) {
             synchronized (lock) {
                 while (nextSeqNum < base + windowSize && nextSeqNum < frames.size()) {
-                    System.out.println("[Sender-GBN] Sending frame " + (nextSeqNum % Frame.MAX_SEQ));
+                    log("[Sender-GBN] Sending frame " + (nextSeqNum % Frame.MAX_SEQ));
                     Frame f = frames.get(nextSeqNum);
                     Channel(f);
                     if (base == nextSeqNum) {
@@ -38,7 +38,7 @@ public class GoBackNSender extends Sender {
                 lock.wait(currentTimeoutMs);
             }
         }
-        System.out.println("[Sender-GBN] All frames sent successfully.");
+        log("[Sender-GBN] All frames sent successfully.");
     }
 
     private int getAbsoluteAck(int ackNo, int base) {
@@ -54,7 +54,7 @@ public class GoBackNSender extends Sender {
 
     @Override
     protected void Recv(Ack ack) {
-        System.out.println("[Sender-GBN] Received " + ack);
+        log("[Sender-GBN] Received " + ack);
         synchronized (lock) {
             int ackNo = ack.getAckNo();
             int absAckNo = getAbsoluteAck(ackNo, base);
@@ -75,7 +75,7 @@ public class GoBackNSender extends Sender {
     protected void handleTimeout(int seqNo) {
         synchronized (lock) {
             if (seqNo == base % Frame.MAX_SEQ) {
-                System.out.println("[Sender-GBN] Timeout for window base " + (base % Frame.MAX_SEQ) + ", retransmitting window.");
+                log("[Sender-GBN] Timeout for window base " + (base % Frame.MAX_SEQ) + ", retransmitting window.");
                 nextSeqNum = base;
                 lock.notifyAll();
             }

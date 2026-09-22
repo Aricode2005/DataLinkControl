@@ -25,10 +25,10 @@ public class StopAndWaitSender extends Sender {
                 }
             }
         }
-        System.out.println("[Sender-SAW] All frames sent successfully.");
+        log("[Sender-SAW] All frames sent successfully.");
     }
     private void sendCurrentFrame() throws IOException {
-        System.out.println("[Sender-SAW] Sending frame " + currentFrame.getSeqNo());
+        log("[Sender-SAW] Sending frame " + currentFrame.getSeqNo());
         waitingForAck = true;
         expectedAck = (currentFrame.getSeqNo() + 1) % 2;
         Timer(currentFrame.getSeqNo());
@@ -36,7 +36,7 @@ public class StopAndWaitSender extends Sender {
     }
     @Override
     protected void Recv(Ack ack) {
-        System.out.println("[Sender-SAW] Received " + ack);
+        log("[Sender-SAW] Received " + ack);
         if (ack.getAckNo() == expectedAck) {
             Timeout();
             stopTimer(currentFrame.getSeqNo());
@@ -49,7 +49,7 @@ public class StopAndWaitSender extends Sender {
     @Override
     protected void handleTimeout(int seqNo) {
         if (waitingForAck) {
-            System.out.println("[Sender-SAW] Timeout for frame " + currentFrame.getSeqNo() + ", retransmitting.");
+            log("[Sender-SAW] Timeout for frame " + currentFrame.getSeqNo() + ", retransmitting.");
             try {
                 sendCurrentFrame();
             } catch (IOException e) {

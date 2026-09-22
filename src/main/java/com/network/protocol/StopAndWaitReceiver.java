@@ -10,17 +10,17 @@ public class StopAndWaitReceiver extends Receiver {
     }
     @Override
     protected void Recv(Frame frame) {
-        System.out.println("[Receiver-SAW] Received frame " + frame.getSeqNo());
+        log("[Receiver-SAW] Received frame " + frame.getSeqNo());
         if (!Check(frame)) {
-            System.out.println("[Receiver-SAW] Frame corrupted, discarding.");
+            log("[Receiver-SAW] Frame corrupted, discarding.");
             return;
         }
         if (frame.getSeqNo() == expectedSeqNo) {
-            System.out.println("[Receiver-SAW] Frame accepted: " + new String(frame.getPayload()));
+            log("[Receiver-SAW] Frame accepted: " + new String(frame.getPayload()));
             statBytesReceived += frame.getPayload().length;
             expectedSeqNo = (expectedSeqNo + 1) % 2;
         } else {
-            System.out.println("[Receiver-SAW] Duplicate frame received.");
+            log("[Receiver-SAW] Duplicate frame received.");
         }
         try {
             Send(expectedSeqNo, false);

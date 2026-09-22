@@ -13,18 +13,18 @@ public class GoBackNReceiver extends Receiver {
 
     @Override
     protected void Recv(Frame frame) {
-        System.out.println("[Receiver-GBN] Received frame " + frame.getSeqNo());
+        log("[Receiver-GBN] Received frame " + frame.getSeqNo());
         if (!Check(frame)) {
-            System.out.println("[Receiver-GBN] Frame corrupted, discarding.");
+            log("[Receiver-GBN] Frame corrupted, discarding.");
             return;
         }
         int seqNo = frame.getSeqNo();
         if (seqNo == (expectedSeqNo % Frame.MAX_SEQ)) {
-            System.out.println("[Receiver-GBN] Frame accepted: " + new String(frame.getPayload()));
+            log("[Receiver-GBN] Frame accepted: " + new String(frame.getPayload()));
             statBytesReceived += frame.getPayload().length;
             expectedSeqNo++;
         } else {
-            System.out.println("[Receiver-GBN] Out of order frame, expected " + (expectedSeqNo % Frame.MAX_SEQ) + ", got " + seqNo);
+            log("[Receiver-GBN] Out of order frame, expected " + (expectedSeqNo % Frame.MAX_SEQ) + ", got " + seqNo);
         }
         try {
             Send(expectedSeqNo % Frame.MAX_SEQ, false); 
