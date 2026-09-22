@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Link Layer Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --panel-bg: #1a1d2d;
+            --text-color: #c9d1d9;
+            --primary: #58a6ff;
+            --accent: #ff7b72;
+            --success: #3fb950;
+            --border: #30363d;
+            --terminal-bg: #0d1117;
+            --terminal-text: #00ff00;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h1, h2, h3 { color: #ffffff; margin-top: 0; }
+        .controls { display: flex; flex-direction: column; gap: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: bold; font-size: 0.9em; color: #8b949e; }
+        input, select, textarea {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border);
+            color: var(--text-color);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        button {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #79c0ff; }
+        button.danger { background-color: var(--accent); }
+        button.danger:hover { background-color: #ff938a; }
+        
+        .terminal-container {
+            grid-column: span 2;
+            background-color: var(--terminal-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+        .terminal-header {
+            background-color: #161b22;
+            padding: 8px 15px;
+            border-bottom: 1px solid var(--border);
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #8b949e;
+        }
+        .terminal-output {
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            color: var(--terminal-text);
+            overflow-y: auto;
+            flex-grow: 1;
+            white-space: pre-wrap;
+        }
+        .session-code {
+            font-size: 2em;
+            font-weight: bold;
+            color: var(--success);
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed var(--success);
+            border-radius: 8px;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8); align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background-color: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border);
+            width: 80%; max-width: 600px; max-height: 80vh; overflow-y: auto;
+        }
+        .modal.active { display: flex; }
+        
+        /* Range slider styling */
+        input[type=range] { padding: 0; }
+        .val-display { color: var(--primary); font-weight: bold; float: right; }
+        
+        .role-selector { grid-column: span 2; display: flex; gap: 10px; margin-bottom: 20px; }
+        .role-btn { flex: 1; padding: 15px; font-size: 1.2em; background-color: var(--panel-bg); color: var(--text-color); border: 1px solid var(--border); }
+        .role-btn.active { background-color: var(--primary); color: #000; border-color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <h1>Data Link Layer Flow Control</h1>
+    
+    <div class="container">
+        
+        <div class="role-selector">
+            <button class="role-btn active" id="btnSenderMode" onclick="setMode('sender')">Sender Mode (Transmission)</button>
+            <button class="role-btn" id="btnReceiverMode" onclick="setMode('receiver')">Receiver Mode (Listening)</button>
+        </div>
+
+        <!-- SENDER PANEL -->
+        <div class="panel" id="senderPanel">
+            <h2>Transmitter Controls</h2>
+            <div class="controls">
+                <div class="form-group">
+                    <label>Receiver Session Code (Virtual IP)</label>
+                    <input type="number" id="sessionCode" placeholder="Enter code generated by receiver tab...">
+                </div>
+                <div class="form-group">
+                    <label>ARQ Protocol</label>
+                    <select id="protocol">
+                        <option value="SR">Selective Repeat (SR)</option>
+                        <option value="GBN">Go-Back-N (GBN)</option>
+                        <option value="SAW">Stop-and-Wait (SAW)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="windowGroup">
+                    <label>Window Size (N) <span style="float:right; font-weight:normal; color:#8b949e">Max GBN: 15 | Max SR: 8</span></label>
+                    <input type="number" id="windowSize" value="7" min="1" max="15">
+                </div>
+                
+                <!-- Test Runner Controls -->
+                <div style="margin-top: 15px; padding: 15px; border: 1px solid var(--border); border-radius: 4px; background: #161b22;">
+                    <h3 style="font-size: 1em; margin-bottom: 10px;">Network Conditions (Test Runner)</h3>
+                    <div class="form-group">
+                        <label>Error Probability <span id="errVal" class="val-display">0.2</span></label>
+                        <input type="range" id="errorProb" min="0" max="0.5" step="0.05" value="0.2" oninput="document.getElementById('errVal').innerText=this.value">
+                    </div>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>Delay Probability <span id="delVal" class="val-display">0.1</span></label>
+                        <input type="range" id="delayProb" min="0" max="0.5" step="0.05" value="0.1" oninput="document.getElementById('delVal').innerText=this.value">
+                    </div>
+                    <p style="font-size: 0.8em; color: #8b949e; margin-top:10px;">For Case 2: Set both to 0.<br>For Case 3: Set Delay to 0, Error to > 0.<br>For Case 4: Set Error to 0, Delay to > 0.</p>
+                </div>
+
+                <div class="form-group">
+                    <label>Payload (Text or File)</label>
+                    <input type="file" id="fileUpload" onchange="loadFile()">
+                    <textarea id="payloadText" rows="4" placeholder="Or type custom payload here..."></textarea>
+                </div>
+                <button onclick="startSender()" style="margin-top: 10px;">Start Transmission</button>
+            </div>
+        </div>
+
+        <!-- RECEIVER PANEL -->
+        <div class="panel" id="receiverPanel" style="display: none;">
+            <h2>Receiver Controls</h2>
+            <p style="color: #8b949e;">To simulate transmission, open this URL in another tab/computer, click "Receiver Mode", and generate a Session Code. Then come back here and input it in the Sender Mode.</p>
+            
+            <div class="controls">
+                <div class="form-group">
+                    <label>ARQ Protocol</label>
+                    <select id="recvProtocol">
+                        <option value="SR">Selective Repeat (SR)</option>
+                        <option value="GBN">Go-Back-N (GBN)</option>
+                        <option value="SAW">Stop-and-Wait (SAW)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="recvWindowGroup">
+                    <label>Window Size (N)</label>
+                    <input type="number" id="recvWindowSize" value="7" min="1" max="15">
+                </div>
+                <button onclick="startReceiver()">Generate Session Code & Listen</button>
+                
+                <div id="sessionDisplay" style="display: none;">
+                    <h3>Your Session Code:</h3>
+                    <div class="session-code" id="sessionCodeText">...</div>
+                    <p style="text-align: center; color: var(--primary);">Waiting for connection from Sender...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIVE TERMINAL -->
+        <div class="terminal-container">
+            <div class="terminal-header">server@railway:~$ Live Transmission Logs</div>
+            <div class="terminal-output" id="terminal"></div>
+        </div>
+    </div>
+
+    <!-- STATISTICS MODAL -->
+    <div class="modal" id="statsModal">
+        <div class="modal-content">
+            <h2 style="color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px;">Simulation Finished</h2>
+            <pre id="statsContent" style="font-family: 'Courier New', monospace; color: var(--text-color); white-space: pre-wrap;"></pre>
+            <button onclick="closeModal()" style="width: 100%; margin-top: 20px;">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Set Mode
+        function setMode(mode) {
+            document.getElementById('btnSenderMode').classList.remove('active');
+            document.getElementById('btnReceiverMode').classList.remove('active');
+            
+            if (mode === 'sender') {
+                document.getElementById('btnSenderMode').classList.add('active');
+                document.getElementById('senderPanel').style.display = 'block';
+                document.getElementById('receiverPanel').style.display = 'none';
+            } else {
+                document.getElementById('btnReceiverMode').classList.add('active');
+                document.getElementById('senderPanel').style.display = 'none';
+                document.getElementById('receiverPanel').style.display = 'block';
+            }
+        }
+
+        // File Loader
+        function loadFile() {
+            const file = document.getElementById('fileUpload').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('payloadText').value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Connect WebSocket for Logs
+        const terminal = document.getElementById('terminal');
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(wsProtocol + '//' + window.location.host + '/ws/logs');
+        
+        let statsBuffer = "";
+        let isCollectingStats = false;
+
+        ws.onmessage = function(event) {
+            const msg = event.data;
+            terminal.innerHTML += msg + '<br>';
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            if (msg.includes("=== SENDER STATISTICS ===") || msg.includes("=== RECEIVER STATISTICS ===")) {
+                isCollectingStats = true;
+                statsBuffer += "\n" + msg + "\n";
+            } else if (isCollectingStats) {
+                statsBuffer += msg + "\n";
+                if (msg.includes("=========================")) {
+                    isCollectingStats = false;
+                }
+            }
+            
+            if (msg.includes("SIMULATION_COMPLETE")) {
+                showModal(statsBuffer);
+                statsBuffer = "";
+            }
+        };
+
+        // REST API Calls
+        async function startReceiver() {
+            const prot = document.getElementById('recvProtocol').value;
+            const win = document.getElementById('recvWindowSize').value;
+            const res = await fetch(`/api/receiver/start?protocol=${prot}&windowSize=${win}`, { method: 'POST' });
+            const data = await res.json();
+            
+            document.getElementById('sessionDisplay').style.display = 'block';
+            document.getElementById('sessionCodeText').innerText = data.sessionCode;
+            terminal.innerHTML += `\n<span style="color:var(--primary)">[SYSTEM] Receiver started on Session Code ${data.sessionCode}</span>\n`;
+        }
+
+        async function startSender() {
+            const session = document.getElementById('sessionCode').value;
+            if (!session) { alert("Please enter the Receiver's Session Code!"); return; }
+            
+            const prot = document.getElementById('protocol').value;
+            const win = document.getElementById('windowSize').value;
+            const err = document.getElementById('errorProb').value;
+            const del = document.getElementById('delayProb').value;
+            let payload = document.getElementById('payloadText').value;
+            
+            if (!payload) {
+                payload = "Dummy data generation because no file or text was provided. ".repeat(20);
+                document.getElementById('payloadText').value = payload;
+            }
+
+            terminal.innerHTML = ""; // clear terminal
+            statsBuffer = "";
+            
+            const formData = new URLSearchParams();
+            formData.append('sessionCode', session);
+            formData.append('protocol', prot);
+            formData.append('windowSize', win);
+            formData.append('errorProb', err);
+            formData.append('delayProb', del);
+            
+            await fetch('/api/sender/start?' + formData.toString(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: payload
+            });
+        }
+
+        function showModal(content) {
+            document.getElementById('statsContent').innerText = content;
+            document.getElementById('statsModal').classList.add('active');
+        }
+        function closeModal() {
+            document.getElementById('statsModal').classList.remove('active');
+        }
+
+        // Toggle window size based on protocol
+        document.getElementById('protocol').addEventListener('change', function(e) {
+            document.getElementById('windowGroup').style.display = e.target.value === 'SAW' ? 'none' : 'flex';
+        });
+        document.getElementById('recvProtocol').addEventListener('change', function(e) {
+            document.getElementById('recvWindowGroup').style.display = e.target.value === 'SAW' ? 'none' : 'flex';
+        });
+    </script>
+</body>
+</html>

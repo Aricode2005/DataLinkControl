@@ -1,4 +1,4 @@
-﻿# Data Link Flow Control Simulation (Java)
+# Data Link Flow Control Simulation (Java)
 
 This project simulates the Data Link Layer flow control mechanisms inside a simulated network environment. It implements **Stop and Wait**, **Go-Back-N ARQ**, and **Selective Repeat ARQ** protocols using Java DatagramSockets (UDP). 
 
@@ -6,29 +6,41 @@ It is designed with low-level design patterns to ensure extensibility, maintaina
 
 ---
 
-## 🚀 How to Run
+## 🚀 How to Run (CLI Mode)
 
-### 1. Compile the Project
-Before running any simulations, ensure all Java files are compiled. Open your terminal in the root directory of the project and run:
-`powershell
-javac -d target (Get-ChildItem -Recurse -File src\main\java\*.java).FullName
-`
+### 1. Compile the Project (Excluding Web Server)
+Before running any simulations, ensure all core Java files are compiled. Open your terminal in the root directory of the project and run:
+```powershell
+javac -d target (Get-ChildItem -Recurse -File src\main\java\*.java | Where-Object { $_.DirectoryName -notmatch "web" }).FullName
+```
 
 ### 2. Interactive Visual Simulation
 To watch the protocols operate in real-time, you must open **two separate terminals** (one for the Receiver and one for the Sender). 
 
-The syntax is: java -cp target com.network.Main [receiver/sender] [SAW/GBN/SR]
+The syntax is: `java -cp target com.network.Main [receiver/sender] [SAW/GBN/SR]`
 
 **Terminal 1 (Receiver):**
-`ash
+```bash
 java -cp target com.network.Main receiver SR
-`
+```
 
 **Terminal 2 (Sender):**
-`ash
+```bash
 java -cp target com.network.Main sender SR
-`
+```
 *(Note: If you choose GBN or SR, the terminal will dynamically prompt you to enter the Window Size (N) before starting.)*
+
+---
+
+## 🌐 How to Run (Web Dashboard Mode)
+This project has been upgraded into a full-stack Spring Boot Web Application for easy cloud deployment.
+
+### 1-Click Railway Deployment
+1. Connect this GitHub repository to Railway.
+2. Railway will automatically detect the `pom.xml` and deploy the Web Server.
+3. Open the provided Railway URL on **Computer A**, click **Receiver Mode**, and click "Generate Session Code".
+4. Open the Railway URL on **Computer B**, click **Sender Mode**, input the Session Code, and hit "Start Transmission"!
+
 
 ---
 
