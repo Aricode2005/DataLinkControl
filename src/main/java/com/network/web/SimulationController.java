@@ -48,7 +48,7 @@ public class SimulationController {
             @RequestParam double delayProb,
             @RequestBody String payloadString) throws Exception {
             
-        NetworkSimulator channel = new NetworkSimulator(errorProb, delayProb, 10, new ErrorInjector(new ErrorInjector.SingleBitError()));
+        NetworkSimulator channel = new NetworkSimulator(delayProb, errorProb, 10, new ErrorInjector(new ErrorInjector.SingleBitError()));
         Sender sender = null;
         
         if (protocol.equals("SAW")) sender = new StopAndWaitSender(0, "127.0.0.1", sessionCode, channel);

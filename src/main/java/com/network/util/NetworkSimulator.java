@@ -85,16 +85,23 @@ public class NetworkSimulator {
             }
         }
 
-        if (delay > 0) {
-            try {
-                Thread.sleep(delay);
-                totalDelayIncurred += delay;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+        final int finalDelay = delay;
+        final byte[] finalData = data;
+        
+        if (finalDelay > 0) {
+            new Thread(() -> {
+                try {
+                    Thread.sleep(finalDelay);
+                    totalDelayIncurred += finalDelay;
+                    DatagramPacket packet = new DatagramPacket(finalData, finalData.length, address, port);
+                    socket.send(packet);
+                } catch (Exception e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        } else {
+            DatagramPacket packet = new DatagramPacket(finalData, finalData.length, address, port);
+            socket.send(packet);
         }
-
-        DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
-        socket.send(packet);
     }
 }
