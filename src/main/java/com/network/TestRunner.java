@@ -68,7 +68,7 @@ public class TestRunner {
         else if (type.equals("GBN")) senderTemp = new GoBackNSender(sPort, "127.0.0.1", receiver.getLocalPort(), sChannel, windowSize);
         else if (type.equals("SR")) senderTemp = new SelectiveRepeatSender(sPort, "127.0.0.1", receiver.getLocalPort(), sChannel, windowSize);
         final Sender sender = senderTemp;
-        sender.setLogger(new com.network.util.logger.NoOpLogger()); sender.startListening();
+        sender.currentTimeoutMs = 100; sender.setLogger(new com.network.util.logger.NoOpLogger()); sender.startListening();
         
         long start = System.currentTimeMillis();
         Thread senderThread = new Thread(() -> {

@@ -79,6 +79,10 @@ public class SelectiveRepeatReceiver extends Receiver {
                 AckNeeded = false;
                 NakSent = false;
             }
+        } else {
+            // FIX: If frame is out of window, it means our previous ACK was lost! 
+            // We must re-send the ACK so the sender can advance.
+            try { Send(Rn % Frame.MAX_SEQ, false); } catch (IOException e) {}
         }
     }
 }
