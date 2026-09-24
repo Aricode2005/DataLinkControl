@@ -13,6 +13,7 @@
 \usepackage{float}
 \usepackage{booktabs}
 \usepackage{makecell}
+\usepackage{multirow}
 
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -401,12 +402,13 @@ Selective Repeat maintains the highest efficiency by decoupling the sender and r
 \begin{table}[H]
 \centering
 \resizebox{\textwidth}{!}{
-\begin{tabular}{@{}lccccc@{}}
+\begin{tabular}{@{}lcccccccccc@{}}
 \toprule
-\textbf{Protocol} & \textbf{0.1} & \textbf{0.2} & \textbf{0.3} & \textbf{0.4} & \textbf{0.5} \\ \midrule
-Stop-and-Wait     & \makecell{76.9\% \\ (846 ms)} & \makecell{66.7\% \\ (1911 ms)} & \makecell{62.5\% \\ (2576 ms)} & \makecell{45.5\% \\ (6100 ms)} & \makecell{42.9\% \\ (6844 ms)} \\ \addlinespace
-Go-Back-N         & \makecell{38.5\% \\ (338 ms)} & \makecell{60.0\% \\ (94 ms)}   & \makecell{49.2\% \\ (345 ms)}  & \makecell{60.0\% \\ (119 ms)}  & \makecell{46.2\% \\ (888 ms)} \\ \addlinespace
-Selective Repeat  & \makecell{96.8\% \\ (30 ms)}  & \makecell{71.4\% \\ (582 ms)}  & \makecell{56.6\% \\ (873 ms)}  & \makecell{55.6\% \\ (925 ms)}  & \makecell{52.6\% \\ (1275 ms)} \\ \bottomrule
+\multirow{2}{*}{\textbf{Protocol}} & \multicolumn{2}{c}{\textbf{0.1}} & \multicolumn{2}{c}{\textbf{0.2}} & \multicolumn{2}{c}{\textbf{0.3}} & \multicolumn{2}{c}{\textbf{0.4}} & \multicolumn{2}{c}{\textbf{0.5}} \\ \cmidrule(l){2-3} \cmidrule(l){4-5} \cmidrule(l){6-7} \cmidrule(l){8-9} \cmidrule(l){10-11}
+ & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} \\ \midrule
+Stop-and-Wait & 76.9\% & 846 ms & 66.7\% & 1911 ms & 62.5\% & 2576 ms & 45.5\% & 6100 ms & 42.9\% & 6844 ms \\ \addlinespace
+Go-Back-N & 38.5\% & 338 ms & 60.0\% & 94 ms & 49.2\% & 345 ms & 60.0\% & 119 ms & 46.2\% & 888 ms \\ \addlinespace
+Selective Repeat & 96.8\% & 30 ms & 71.4\% & 582 ms & 56.6\% & 873 ms & 55.6\% & 925 ms & 52.6\% & 1275 ms \\ \bottomrule
 \end{tabular}
 }
 \caption{Efficiency and Avg RTT under varying Error Probabilities}
@@ -474,12 +476,13 @@ Selective Repeat handles random delays exceptionally well. Because it relies on 
 \begin{table}[H]
 \centering
 \resizebox{\textwidth}{!}{
-\begin{tabular}{@{}lccccc@{}}
+\begin{tabular}{@{}lcccccccccc@{}}
 \toprule
-\textbf{Protocol} & \textbf{0.1} & \textbf{0.2} & \textbf{0.3} & \textbf{0.4} & \textbf{0.5} \\ \midrule
-Stop-and-Wait     & \makecell{90.9\% \\ (26 ms)} & \makecell{83.3\% \\ (280 ms)} & \makecell{81.1\% \\ (487 ms)} & \makecell{83.3\% \\ (852 ms)} & \makecell{78.9\% \\ (1182 ms)} \\ \addlinespace
-Go-Back-N         & \makecell{75.0\% \\ (37 ms)} & \makecell{46.9\% \\ (380 ms)} & \makecell{41.7\% \\ (783 ms)} & \makecell{58.8\% \\ (1074 ms)}& \makecell{46.2\% \\ (1463 ms)} \\ \addlinespace
-Selective Repeat  & \makecell{93.8\% \\ (12 ms)} & \makecell{69.8\% \\ (379 ms)} & \makecell{71.4\% \\ (304 ms)} & \makecell{68.2\% \\ (722 ms)} & \makecell{61.2\% \\ (555 ms)} \\ \bottomrule
+\multirow{2}{*}{\textbf{Protocol}} & \multicolumn{2}{c}{\textbf{0.1}} & \multicolumn{2}{c}{\textbf{0.2}} & \multicolumn{2}{c}{\textbf{0.3}} & \multicolumn{2}{c}{\textbf{0.4}} & \multicolumn{2}{c}{\textbf{0.5}} \\ \cmidrule(l){2-3} \cmidrule(l){4-5} \cmidrule(l){6-7} \cmidrule(l){8-9} \cmidrule(l){10-11}
+ & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} & \textbf{Eff} & \textbf{RTT} \\ \midrule
+Stop-and-Wait & 90.9\% & 26 ms & 83.3\% & 280 ms & 81.1\% & 487 ms & 83.3\% & 852 ms & 78.9\% & 1182 ms \\ \addlinespace
+Go-Back-N & 75.0\% & 37 ms & 46.9\% & 380 ms & 41.7\% & 783 ms & 58.8\% & 1074 ms & 46.2\% & 1463 ms \\ \addlinespace
+Selective Repeat & 93.8\% & 12 ms & 69.8\% & 379 ms & 71.4\% & 304 ms & 68.2\% & 722 ms & 61.2\% & 555 ms \\ \bottomrule
 \end{tabular}
 }
 \caption{Efficiency and Avg RTT under varying Delay Probabilities}
