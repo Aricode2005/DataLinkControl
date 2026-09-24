@@ -44,9 +44,9 @@ public class SelectiveRepeatSender extends Sender {
     private int getAbsoluteSeq(int seqNoMod, int base) {
         int baseMod = base % Frame.MAX_SEQ;
         int diff = seqNoMod - baseMod;
-        if (diff < 0) diff += Frame.MAX_SEQ;
+        if (diff <= 0) diff += Frame.MAX_SEQ; // Cumulative ACKs wrap forward like GBN
         int abs = base + diff;
-        if (abs >= base + windowSize) {
+        if (abs > base + windowSize) {
             abs -= Frame.MAX_SEQ;
         }
         return abs;
@@ -58,8 +58,21 @@ public class SelectiveRepeatSender extends Sender {
         synchronized (lock) {
             int ackNoMod = ack.getAckNo();
             int absAckNo = getAbsoluteSeq(ackNoMod, base);
+            
+            // Cumulative logic for both ACK and NAK (means everything before absAckNo was successfully received)
+            if (absAckNo > base && absAckNo <= nextSeqNum) {
+                Timeout();
+                while (base < absAckNo) {
+                    acked[base] = true;
+                    stopTimer(base);
+                    base++;
+                }
+                lock.notifyAll();
+            }
+
             if (ack.isNak()) {
                 totalNaksReceived++; // TRACKING: NAK received
+                // Retransmit the explicitly requested frame
                 if (absAckNo >= base && absAckNo < nextSeqNum && !acked[absAckNo]) {
                     log("[Sender-SR] Received NAK for " + (absAckNo % Frame.MAX_SEQ) + ", retransmitting.");
                     try {
@@ -67,16 +80,6 @@ public class SelectiveRepeatSender extends Sender {
                         stopTimer(absAckNo);
                         Timer(absAckNo);
                     } catch (Exception e) {}
-                }
-            } else {
-                if (absAckNo >= base && absAckNo < nextSeqNum && !acked[absAckNo]) {
-                    acked[absAckNo] = true;
-                    stopTimer(absAckNo);
-                    Timeout();
-                    while (base < acked.length && acked[base]) {
-                        base++;
-                    }
-                    lock.notifyAll();
                 }
             }
         }

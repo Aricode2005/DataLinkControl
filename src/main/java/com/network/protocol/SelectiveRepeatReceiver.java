@@ -1,21 +1,27 @@
 package com.network.protocol;
+
 import com.network.model.Frame;
 import com.network.receiver.Receiver;
 import com.network.util.NetworkSimulator;
+
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class SelectiveRepeatReceiver extends Receiver {
+    private int Rn = 0;
+    private boolean NakSent = false;
+    private boolean AckNeeded = false;
+    private boolean[] Marked = new boolean[Frame.MAX_SEQ];
+    private Frame[] bufferArr = new Frame[Frame.MAX_SEQ];
     private int windowSize;
-    private int base = 0;
-    private Map<Integer, Frame> buffer = new HashMap<>();
 
     public SelectiveRepeatReceiver(int localPort, NetworkSimulator channel, int windowSize) throws Exception {
         super(localPort, channel);
         this.windowSize = windowSize;
+        for (int i = 0; i < Frame.MAX_SEQ; i++) {
+            Marked[i] = false;
+        }
     }
-    
+
     private int getAbsoluteSeq(int seqNoMod, int base) {
         int baseMod = base % Frame.MAX_SEQ;
         int diff = seqNoMod - baseMod;
@@ -29,40 +35,53 @@ public class SelectiveRepeatReceiver extends Receiver {
 
     @Override
     protected void Recv(Frame frame) {
-        int seqNoMod = frame.getSeqNo();
-        log("[Receiver-SR] Received frame " + seqNoMod);
+        log("[Receiver-SR] Data frame arrives: " + frame.getSeqNo());
+        
         if (!Check(frame)) {
-            log("[Receiver-SR] Frame corrupted, sending NAK.");
-            try {
-                Send(seqNoMod, true);
-            } catch (IOException e) {
-                e.printStackTrace();
+            log("[Receiver-SR] Frame corrupted.");
+            if (!NakSent) {
+                try { Send(Rn % Frame.MAX_SEQ, true); } catch (IOException e) {} // SendNAK(Rn)
+                NakSent = true;
             }
-            return;
+            return; // Sleep()
         }
 
-        int absSeqNo = getAbsoluteSeq(seqNoMod, base);
-        if (absSeqNo >= base && absSeqNo < base + windowSize) {
-            log("[Receiver-SR] Frame " + (absSeqNo % Frame.MAX_SEQ) + " buffered.");
-            buffer.put(absSeqNo, frame);
-            try {
-                Send(seqNoMod, false); 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            while (buffer.containsKey(base)) {
-                Frame f = buffer.remove(base);
-                log("[Receiver-SR] Frame " + (base % Frame.MAX_SEQ) + " accepted/delivered: " + new String(f.getPayload()));
+        int seqNo = frame.getSeqNo();
+        
+        if (seqNo != (Rn % Frame.MAX_SEQ) && !NakSent) {
+            log("[Receiver-SR] Out of order. seqNo=" + seqNo + ", Rn=" + (Rn % Frame.MAX_SEQ));
+            try { Send(Rn % Frame.MAX_SEQ, true); } catch (IOException e) {} // SendNAK(Rn)
+            NakSent = true;
+        }
+
+        int absSeqNo = getAbsoluteSeq(seqNo, Rn);
+        boolean inWindow = (absSeqNo >= Rn && absSeqNo < Rn + windowSize);
+        
+        if (inWindow && !Marked[seqNo]) {
+            // StoreFrame(seqNo)
+            bufferArr[seqNo] = frame;
+            // Marked(seqNo) = true
+            Marked[seqNo] = true;
+            
+            while (Marked[Rn % Frame.MAX_SEQ]) {
+                // DeliverData(Rn)
+                Frame f = bufferArr[Rn % Frame.MAX_SEQ];
+                log("[Receiver-SR] Frame delivered: " + new String(f.getPayload()));
                 statBytesReceived += f.getPayload().length;
                 try { finalDocument.write(f.getPayload()); } catch(Exception e){}
-                base++;
+                
+                // Purge(Rn)
+                Marked[Rn % Frame.MAX_SEQ] = false;
+                bufferArr[Rn % Frame.MAX_SEQ] = null;
+                
+                Rn = Rn + 1;
+                AckNeeded = true;
             }
-        } else if (absSeqNo >= base - windowSize && absSeqNo < base) {
-            log("[Receiver-SR] Received duplicate frame " + (absSeqNo % Frame.MAX_SEQ) + ", re-ACKing.");
-            try {
-                Send(seqNoMod, false);
-            } catch (IOException e) {
-                e.printStackTrace();
+            
+            if (AckNeeded) {
+                try { Send(Rn % Frame.MAX_SEQ, false); } catch (IOException e) {} // SendAck(Rn)
+                AckNeeded = false;
+                NakSent = false;
             }
         }
     }
