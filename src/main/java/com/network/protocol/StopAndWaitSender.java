@@ -46,8 +46,8 @@ public class StopAndWaitSender extends Sender {
         log("[Sender-SAW] ArrivalNotification: " + ack);
         synchronized (lock) {
             int ackNo = ack.getAckNo();
-            if (ackNo == (Sn % 2)) { // if (not corrupted AND ackNo == Sn)
-                stopTimer((Sn - 1) % 2); // StopTimer()
+            if (ackNo == (Sn % 2)) { 
+                for (java.util.Timer t : timers.values()) t.cancel(); timers.clear(); // StopTimer() 
                 Timeout();
                 // PurgeFrame(Sn - 1)
                 canSend = true;
@@ -59,11 +59,11 @@ public class StopAndWaitSender extends Sender {
     @Override
     protected void handleTimeout(int seqNo) {
         synchronized (lock) {
-            if (!canSend) { // The timer expired
+            if (!canSend) { 
                 log("[Sender-SAW] TimeOut, resending frame " + ((Sn - 1) % 2));
-                Timer((Sn - 1) % 2); // StartTimer()
+                Timer((Sn - 1) % 2);
                 try {
-                    Channel(currentFrame); // ResendFrame(Sn - 1)
+                    Channel(currentFrame); 
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

@@ -67,7 +67,7 @@ public abstract class Sender {
             ((Frame) obj).setTimestamp(System.currentTimeMillis());
             ((Frame) obj).incrementTransmissions();
         }
-        channel.sendWithSimulation(socket, obj, receiverAddress, receiverPort);
+        channel.sendWithSimulation(socket, obj, receiverAddress, receiverPort); try { Thread.sleep(2); } catch (Exception e) {}
     }
 
     protected void Timer(int seqNo) {

@@ -20,7 +20,7 @@ public class StopAndWaitReceiver extends Receiver {
         }
         
         int seqNo = frame.getSeqNo();
-        if (seqNo == (Rn % 2)) { // Stop-and-Wait modulo is 2
+        if (seqNo == (Rn % 2)) { 
             log("[Receiver-SAW] Frame accepted: " + new String(frame.getPayload()));
             statBytesReceived += frame.getPayload().length;
             try { finalDocument.write(frame.getPayload()); } catch(Exception e){}
@@ -34,7 +34,7 @@ public class StopAndWaitReceiver extends Receiver {
         } else {
             log("[Receiver-SAW] Duplicate frame received. seqNo=" + seqNo + ", expected=" + (Rn % 2));
             try {
-                Send(Rn % 2, false); // SAW sends ACK(Rn) for duplicates to recover lost ACKs
+                Send(Rn % 2, false); 
             } catch (IOException e) {
                 e.printStackTrace();
             }

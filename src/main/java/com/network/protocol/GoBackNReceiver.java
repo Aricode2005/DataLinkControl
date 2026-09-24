@@ -33,7 +33,10 @@ public class GoBackNReceiver extends Receiver {
                 e.printStackTrace();
             }
         } else {
-            log("[Receiver-GBN] Out of order frame, ignoring (Sleep). expected: " + (Rn % Frame.MAX_SEQ) + ", got: " + seqNo);
+                        log("[Receiver-GBN] Out of order frame, ignoring (Sleep). expected: " + (Rn % Frame.MAX_SEQ) + ", got: " + seqNo);
+            try {
+                Send(Rn % Frame.MAX_SEQ, false); // FIX: Must send ACK to prevent deadlock if ACK was lost
+            } catch (IOException e) {}
         }
     }
 }

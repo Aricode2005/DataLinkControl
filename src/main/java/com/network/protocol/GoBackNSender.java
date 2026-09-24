@@ -70,7 +70,7 @@ public class GoBackNSender extends Sender {
                     Sf = Sf + 1;
                 }
                 
-                stopTimer((Sf - 1) % Frame.MAX_SEQ); 
+                for (java.util.Timer t : timers.values()) t.cancel(); timers.clear(); // StopTimer() 
                 
                 // Forouzan bug prevention: restart timer if frames still in flight
                 if (Sf < Sn) {

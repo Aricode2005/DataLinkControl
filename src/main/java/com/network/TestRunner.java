@@ -10,7 +10,7 @@ import java.io.PrintWriter;
 public class TestRunner {
     private static int portCounter = 10000;
     public static void main(String[] args) throws Exception {
-        PrintWriter out = new PrintWriter(new FileWriter("comparative_analysis.txt"), true);
+        PrintWriter out = new PrintWriter(new FileWriter("final_analysis.txt"), true);
         System.out.println("Starting Comparative Analysis... (This will take a few minutes under heavy network delay)");
         
         out.println("=== Data Link Layer Comparative Analysis ===");
@@ -47,7 +47,7 @@ public class TestRunner {
         }
         
         out.close();
-        System.out.println("\nAnalysis completely finished! All data saved to comparative_analysis.txt");
+        System.out.println("\nAnalysis completely finished! All data saved to final_analysis.txt");
     }
     
     private static void runTest(PrintWriter out, String name, String type, int windowSize, double delayProb, double errProb, byte[][] data) throws Exception {
@@ -60,7 +60,7 @@ public class TestRunner {
         if (type.equals("SAW")) receiver = new StopAndWaitReceiver(rPort, rChannel);
         else if (type.equals("GBN")) receiver = new GoBackNReceiver(rPort, rChannel);
         else if (type.equals("SR")) receiver = new SelectiveRepeatReceiver(rPort, rChannel, windowSize);
-        receiver.startListening();
+        receiver.setLogger(new com.network.util.logger.NoOpLogger()); receiver.startListening();
         
         int sPort = portCounter++;
         Sender senderTemp = null;
@@ -68,11 +68,11 @@ public class TestRunner {
         else if (type.equals("GBN")) senderTemp = new GoBackNSender(sPort, "127.0.0.1", receiver.getLocalPort(), sChannel, windowSize);
         else if (type.equals("SR")) senderTemp = new SelectiveRepeatSender(sPort, "127.0.0.1", receiver.getLocalPort(), sChannel, windowSize);
         final Sender sender = senderTemp;
-        sender.startListening();
+        sender.setLogger(new com.network.util.logger.NoOpLogger()); sender.startListening();
         
         long start = System.currentTimeMillis();
         Thread senderThread = new Thread(() -> {
-            try { sender.Send(data); } catch (Exception e) {}
+            try { sender.Send(data); } catch (Exception e) { e.printStackTrace(); }
         });
         senderThread.start();
         senderThread.join();
