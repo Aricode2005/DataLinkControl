@@ -8,15 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class GoBackNSender extends Sender {
-    private int windowSize;
-    private int base = 0;
-    private int nextSeqNum = 0;
+    private int Sw;
+    private int Sf = 0;
+    private int Sn = 0;
     private List<Frame> frames = new ArrayList<>();
     private final Object lock = new Object();
 
     public GoBackNSender(int localPort, String receiverIp, int receiverPort, NetworkSimulator channel, int windowSize) throws Exception {
         super(localPort, receiverIp, receiverPort, channel);
-        this.windowSize = windowSize;
+        this.Sw = windowSize;
     }
 
     @Override
@@ -24,18 +24,20 @@ public class GoBackNSender extends Sender {
         for (int i = 0; i < dataChunks.length; i++) {
             frames.add(Framing(i % Frame.MAX_SEQ, dataChunks[i])); 
         }
-        while (base < frames.size()) {
+        while (Sf < frames.size()) {
             synchronized (lock) {
-                while (nextSeqNum < base + windowSize && nextSeqNum < frames.size()) {
-                    log("[Sender-GBN] Sending frame " + (nextSeqNum % Frame.MAX_SEQ));
-                    Frame f = frames.get(nextSeqNum);
+                while (Sn < Sf + Sw && Sn < frames.size()) {
+                    log("[Sender-GBN] Sending frame " + (Sn % Frame.MAX_SEQ));
+                    Frame f = frames.get(Sn);
                     Channel(f);
-                    if (base == nextSeqNum) {
-                        Timer(base % Frame.MAX_SEQ);
+                    
+                    if (Sf == Sn) { // Timer not running concept
+                        Timer(Sf % Frame.MAX_SEQ);
                     }
-                    nextSeqNum++;
+                    
+                    Sn = Sn + 1;
                 }
-                lock.wait(currentTimeoutMs);
+                lock.wait(100);
             }
         }
         log("[Sender-GBN] All frames sent successfully.");
@@ -46,7 +48,7 @@ public class GoBackNSender extends Sender {
         int diff = ackNo - baseMod;
         if (diff <= 0) diff += Frame.MAX_SEQ;
         int abs = base + diff;
-        if (abs > base + windowSize) {
+        if (abs > base + Sw) {
             abs -= Frame.MAX_SEQ;
         }
         return abs;
@@ -54,18 +56,27 @@ public class GoBackNSender extends Sender {
 
     @Override
     protected void Recv(Ack ack) {
-        log("[Sender-GBN] Received " + ack);
+        log("[Sender-GBN] ACK arrives: " + ack);
         synchronized (lock) {
-            int ackNo = ack.getAckNo();
-            int absAckNo = getAbsoluteAck(ackNo, base);
-            if (absAckNo > base && absAckNo <= nextSeqNum) {
+            int ackNoMod = ack.getAckNo();
+            int ackNo = getAbsoluteAck(ackNoMod, Sf);
+            
+            if (ackNo > Sf && ackNo <= Sn) {
                 totalCumulativeAcks++; // TRACKING: Valid Cumulative ACK
                 Timeout();
-                stopTimer(base % Frame.MAX_SEQ); 
-                base = absAckNo;
-                if (base < nextSeqNum) {
-                    Timer(base % Frame.MAX_SEQ);
+                
+                while (Sf < ackNo) {
+                    // PurgeFrame(Sf)
+                    Sf = Sf + 1;
                 }
+                
+                stopTimer((Sf - 1) % Frame.MAX_SEQ); 
+                
+                // Forouzan bug prevention: restart timer if frames still in flight
+                if (Sf < Sn) {
+                    Timer(Sf % Frame.MAX_SEQ);
+                }
+                
                 lock.notifyAll();
             }
         }
@@ -74,10 +85,17 @@ public class GoBackNSender extends Sender {
     @Override
     protected void handleTimeout(int seqNo) {
         synchronized (lock) {
-            if (seqNo == base % Frame.MAX_SEQ) {
-                log("[Sender-GBN] Timeout for window base " + (base % Frame.MAX_SEQ) + ", retransmitting window.");
-                nextSeqNum = base;
-                lock.notifyAll();
+            log("[Sender-GBN] TimeOut, retransmitting window starting from " + (Sf % Frame.MAX_SEQ));
+            Timer(Sf % Frame.MAX_SEQ); // StartTimer()
+            
+            int Temp = Sf;
+            while (Temp < Sn) {
+                try {
+                    Channel(frames.get(Temp)); // SendFrame(Temp)
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                Temp = Temp + 1;
             }
         }
     }

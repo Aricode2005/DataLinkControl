@@ -4,56 +4,69 @@ import com.network.model.Frame;
 import com.network.sender.Sender;
 import com.network.util.NetworkSimulator;
 import java.io.IOException;
+
 public class StopAndWaitSender extends Sender {
-    private boolean waitingForAck = false;
+    private int Sn = 0;
+    private boolean canSend = true;
     private Frame currentFrame;
-    private int expectedAck = 1;
-    private final Object lock = new Object();
+
     public StopAndWaitSender(int localPort, String receiverIp, int receiverPort, NetworkSimulator channel) throws Exception {
         super(localPort, receiverIp, receiverPort, channel);
     }
+
     @Override
     public void Send(byte[][] dataChunks) throws Exception {
-        int seqNo = 0;
-        for (byte[] data : dataChunks) {
-            seqNo = (seqNo + 1) % 2; 
-            currentFrame = Framing(seqNo, data);
-            sendCurrentFrame();
+        for (int i = 0; i < dataChunks.length; i++) {
             synchronized (lock) {
-                while (waitingForAck) {
-                    lock.wait(); 
+                while (!canSend) {
+                    lock.wait(100);
                 }
+                
+                log("[Sender-SAW] A packet to send");
+                currentFrame = Framing(Sn % 2, dataChunks[i]);
+                Channel(currentFrame);
+                Timer(Sn % 2);
+                
+                Sn = Sn + 1;
+                canSend = false;
             }
         }
+        
+        synchronized (lock) {
+            while (!canSend) {
+                lock.wait(100);
+            }
+        }
+        
         log("[Sender-SAW] All frames sent successfully.");
     }
-    private void sendCurrentFrame() throws IOException {
-        log("[Sender-SAW] Sending frame " + currentFrame.getSeqNo());
-        waitingForAck = true;
-        expectedAck = (currentFrame.getSeqNo() + 1) % 2;
-        Timer(currentFrame.getSeqNo());
-        Channel(currentFrame);
-    }
+
     @Override
     protected void Recv(Ack ack) {
-        log("[Sender-SAW] Received " + ack);
-        if (ack.getAckNo() == expectedAck) {
-            Timeout();
-            stopTimer(currentFrame.getSeqNo());
-            waitingForAck = false;
-            synchronized (lock) {
+        log("[Sender-SAW] ArrivalNotification: " + ack);
+        synchronized (lock) {
+            int ackNo = ack.getAckNo();
+            if (ackNo == (Sn % 2)) { // if (not corrupted AND ackNo == Sn)
+                stopTimer((Sn - 1) % 2); // StopTimer()
+                Timeout();
+                // PurgeFrame(Sn - 1)
+                canSend = true;
                 lock.notifyAll();
             }
         }
     }
+
     @Override
     protected void handleTimeout(int seqNo) {
-        if (waitingForAck) {
-            log("[Sender-SAW] Timeout for frame " + currentFrame.getSeqNo() + ", retransmitting.");
-            try {
-                sendCurrentFrame();
-            } catch (IOException e) {
-                e.printStackTrace();
+        synchronized (lock) {
+            if (!canSend) { // The timer expired
+                log("[Sender-SAW] TimeOut, resending frame " + ((Sn - 1) % 2));
+                Timer((Sn - 1) % 2); // StartTimer()
+                try {
+                    Channel(currentFrame); // ResendFrame(Sn - 1)
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

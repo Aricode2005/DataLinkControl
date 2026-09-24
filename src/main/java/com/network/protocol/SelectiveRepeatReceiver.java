@@ -43,7 +43,7 @@ public class SelectiveRepeatReceiver extends Receiver {
                 try { Send(Rn % Frame.MAX_SEQ, true); } catch (IOException e) {} // SendNAK(Rn)
                 NakSent = true;
             }
-            return; // Sleep()
+            return;
         }
 
         int seqNo = frame.getSeqNo();
@@ -58,19 +58,15 @@ public class SelectiveRepeatReceiver extends Receiver {
         boolean inWindow = (absSeqNo >= Rn && absSeqNo < Rn + windowSize);
         
         if (inWindow && !Marked[seqNo]) {
-            // StoreFrame(seqNo)
             bufferArr[seqNo] = frame;
-            // Marked(seqNo) = true
             Marked[seqNo] = true;
             
             while (Marked[Rn % Frame.MAX_SEQ]) {
-                // DeliverData(Rn)
                 Frame f = bufferArr[Rn % Frame.MAX_SEQ];
                 log("[Receiver-SR] Frame delivered: " + new String(f.getPayload()));
                 statBytesReceived += f.getPayload().length;
                 try { finalDocument.write(f.getPayload()); } catch(Exception e){}
                 
-                // Purge(Rn)
                 Marked[Rn % Frame.MAX_SEQ] = false;
                 bufferArr[Rn % Frame.MAX_SEQ] = null;
                 
