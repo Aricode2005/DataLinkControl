@@ -44,7 +44,7 @@ public class SelectiveRepeatSender extends Sender {
     private int getAbsoluteSeq(int seqNoMod, int base) {
         int baseMod = base % Frame.MAX_SEQ;
         int diff = seqNoMod - baseMod;
-        if (diff <= 0) diff += Frame.MAX_SEQ; // Cumulative ACKs wrap forward like GBN
+        if (diff <= 0) diff += Frame.MAX_SEQ; 
         int abs = base + diff;
         if (abs > base + windowSize) {
             abs -= Frame.MAX_SEQ;
@@ -59,27 +59,33 @@ public class SelectiveRepeatSender extends Sender {
             int ackNoMod = ack.getAckNo();
             int absAckNo = getAbsoluteSeq(ackNoMod, base);
             
-            // Cumulative logic for both ACK and NAK (means everything before absAckNo was successfully received)
-            if (absAckNo > base && absAckNo <= nextSeqNum) {
-                Timeout();
-                while (base < absAckNo) {
-                    acked[base] = true;
-                    stopTimer(base);
-                    base++;
-                }
-                lock.notifyAll();
-            }
-
-            if (ack.isNak()) {
-                totalNaksReceived++; // TRACKING: NAK received
-                // Retransmit the explicitly requested frame
-                if (absAckNo >= base && absAckNo < nextSeqNum && !acked[absAckNo]) {
+            if (ack.isNak()) { // if (FrameType == NAK)
+                totalNaksReceived++;
+                // if (nakNo between Sf and Sn)
+                if (absAckNo >= base && absAckNo < nextSeqNum) {
                     log("[Sender-SR] Received NAK for " + (absAckNo % Frame.MAX_SEQ) + ", retransmitting.");
                     try {
+                        // resend(nakNo)
                         Channel(frames.get(absAckNo));
+                        // StartTimer(nakNo)
                         stopTimer(absAckNo);
                         Timer(absAckNo);
                     } catch (Exception e) {}
+                }
+            } else { // if (FrameType == ACK)
+                // if (ackNo between Sf and Sn)
+                if (absAckNo > base && absAckNo <= nextSeqNum) {
+                    Timeout(); 
+                    // while (Sf < ackNo)
+                    while (base < absAckNo) {
+                        // Purge(Sf)
+                        acked[base] = true;
+                        // StopTimer(Sf)
+                        stopTimer(base);
+                        // Sf = Sf + 1
+                        base++;
+                    }
+                    lock.notifyAll();
                 }
             }
         }
