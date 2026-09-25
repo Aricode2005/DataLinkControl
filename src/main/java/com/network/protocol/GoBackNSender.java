@@ -88,6 +88,10 @@ public class GoBackNSender extends Sender {
             log("[Sender-GBN] TimeOut, retransmitting window starting from " + (Sf % Frame.MAX_SEQ));
             Timer(Sf % Frame.MAX_SEQ); // StartTimer()
             
+            if (Sn - Sf > 1) {
+                totalRetransmissions += (Sn - Sf - 1);
+            }
+
             int Temp = Sf;
             while (Temp < Sn) {
                 try {
