@@ -16,7 +16,7 @@ public abstract class Sender {
     protected int receiverPort;
     protected NetworkSimulator channel;
     
-    protected int currentTimeoutMs = 2000;
+    public int currentTimeoutMs = 2000;
     protected ConcurrentHashMap<Integer, Timer> timers = new ConcurrentHashMap<>();
     protected long rttStart = -1;
     
